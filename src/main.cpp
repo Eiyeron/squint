@@ -3,6 +3,7 @@
 #include <cinttypes>
 #include <cstdint>
 #include <cstdio>
+#include <cmath>
 #include <string>
 
 // [HACK] IXWebsocket includes some of Windows' headers, this manua define
@@ -128,7 +129,7 @@ struct Upscaler
                                        uniform.max);
             if (uniform.type == Uniform::Type::Int)
             {
-                newValue = int(newValue);
+                newValue = roundf(newValue);
             }
 
             if (newValue != uniform.value)
@@ -235,8 +236,8 @@ int main(void)
 
     // Initialization
     //--------------------------------------------------------------------------------------
-    const int screenWidth = 800;
-    const int screenHeight = 450;
+    int screenWidth = 800;
+    int screenHeight = 450;
 
     bool showGui = false;
 
@@ -255,6 +256,7 @@ int main(void)
     serv.listenAndStart();
 
     InitWindow(screenWidth, screenHeight, "Squint live viewer");
+    SetWindowState(FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT);
 
     SetTargetFPS(60); // Set our game to run at 60 frames-per-second
 
@@ -297,6 +299,12 @@ int main(void)
         //----------------------------------------------------------------------------------
         {
             BeginDrawing();
+
+            if(IsWindowResized())
+            {
+                screenWidth = GetScreenWidth();
+                screenHeight = GetScreenHeight();
+            }
 
             if (!connected)
             {
@@ -388,9 +396,10 @@ int main(void)
             {
                 float selectedScale =
                     GuiSliderBar({8, 8, 256, 20}, nullptr, "Scale", float(renderScale), 1, 6);
-                if (int(selectedScale) != renderScale)
+                int integerScale = roundf(selectedScale);
+                if (integerScale != renderScale)
                 {
-                    renderScale = int(selectedScale);
+                    renderScale = integerScale;
                     refreshRenderTarget = true;
                     refreshUpscalee = true;
                 }
@@ -409,10 +418,10 @@ int main(void)
                     switch (selectedUpscaler)
                     {
                     case 1:
-                        refreshUpscalee = xbrLv1.draw_settings(24, 72);
+                        refreshUpscalee |= xbrLv1.draw_settings(24, 72);
                         break;
                     case 2:
-                        refreshUpscalee = xbrLv2.draw_settings(24, 72);
+                        refreshUpscalee |= xbrLv2.draw_settings(24, 72);
                         break;
                     default:;
                     }
