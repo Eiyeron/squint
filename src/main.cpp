@@ -1,9 +1,9 @@
 #include "raygui.h"
 #include "raylib.h"
 #include <cinttypes>
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
-#include <cmath>
 #include <string>
 
 // [HACK] IXWebsocket includes some of Windows' headers, this manua define
@@ -16,6 +16,13 @@
 #endif
 #include "ixwebsocket/IXWebSocketMessageType.h"
 #include "ixwebsocket/IXWebSocketServer.h"
+
+enum class UiState
+{
+    Nothing,
+    Main,
+    Help,
+};
 
 bool connected = false;
 
@@ -137,24 +144,24 @@ struct Upscaler
                 if (uniform.type == Uniform::Type::Float)
                 {
                     SetShaderValue(shader,
-                                GetShaderLocation(shader, uniform.uniformName.c_str()),
-                                &uniform.value,
-                                SHADER_UNIFORM_FLOAT);
+                                   GetShaderLocation(shader, uniform.uniformName.c_str()),
+                                   &uniform.value,
+                                   SHADER_UNIFORM_FLOAT);
                 }
                 else
                 {
                     int intValue = newValue;
                     SetShaderValue(shader,
-                                GetShaderLocation(shader, uniform.uniformName.c_str()),
-                                &intValue,
-                                SHADER_UNIFORM_INT);
+                                   GetShaderLocation(shader, uniform.uniformName.c_str()),
+                                   &intValue,
+                                   SHADER_UNIFORM_INT);
                 }
 
                 uniform.value = newValue;
                 changed = true;
             }
 
-            y += 24;
+            y += 32;
         }
 
         return changed;
@@ -231,6 +238,28 @@ struct ImageServer
     }
 };
 
+void DrawTextBorder(const char *text,
+                    float x,
+                    float y,
+                    int size,
+                    Color textColor,
+                    Color outlineColor)
+{
+    for (int xb = -1; xb <= 1; ++xb)
+    {
+        for (int yb = -1; yb <= 1; ++yb)
+        {
+            if (xb == 0 && yb == 0)
+            {
+                continue;
+            }
+
+            DrawText(text, x + xb, y + yb, size, outlineColor);
+        }
+    }
+    DrawText(text, x, y, size, textColor);
+}
+
 int main(void)
 {
 
@@ -239,7 +268,7 @@ int main(void)
     int screenWidth = 800;
     int screenHeight = 450;
 
-    bool showGui = false;
+    UiState uiState = UiState::Nothing;
 
     ImageServer imageServer;
     // init
@@ -256,6 +285,7 @@ int main(void)
     serv.listenAndStart();
 
     InitWindow(screenWidth, screenHeight, "Squint live viewer");
+    SetExitKey(KEY_NULL);
     SetWindowState(FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT);
 
     SetTargetFPS(60); // Set our game to run at 60 frames-per-second
@@ -264,18 +294,47 @@ int main(void)
     RenderTexture2D upscaledTexture{};
 
     Upscaler xbrLv1("../xbr-lv1.frag");
-    xbrLv1.add_uniform(Upscaler::Uniform{Upscaler::Uniform::Type::Float, "Luma Weight", "XbrYWeight", 48.f, 0.f, 100.f});
-    xbrLv1.add_uniform(Upscaler::Uniform{Upscaler::Uniform::Type::Float, "Color match threshold", "XbrEqThreshold", 30.f, 0.f, 50.f});
+    xbrLv1.add_uniform(Upscaler::Uniform{Upscaler::Uniform::Type::Float,
+                                         "Luma Weight",
+                                         "XbrYWeight",
+                                         48.f,
+                                         0.f,
+                                         100.f});
+    xbrLv1.add_uniform(Upscaler::Uniform{Upscaler::Uniform::Type::Float,
+                                         "Color match threshold",
+                                         "XbrEqThreshold",
+                                         30.f,
+                                         0.f,
+                                         50.f});
     Upscaler xbrLv2("../xbr-lv2.frag");
-    xbrLv2.add_uniform(Upscaler::Uniform{Upscaler::Uniform::Type::Int, "Xbr Scale", "XbrScale", 4, 0.f, 5.f});
-    xbrLv2.add_uniform(Upscaler::Uniform{Upscaler::Uniform::Type::Float, "Luma Weight", "XbrYWeight", 48.f, 0.f, 100.f});
-    xbrLv2.add_uniform(Upscaler::Uniform{Upscaler::Uniform::Type::Float, "Color match threshold", "XbrEqThreshold", 30.f, 0.f, 50.f});
-    xbrLv2.add_uniform(Upscaler::Uniform{Upscaler::Uniform::Type::Float, "Lv 2 coefficient", "XbrLv2Coefficient", 2.f, 0.f, 3.f});
+    xbrLv2.add_uniform(
+        Upscaler::Uniform{Upscaler::Uniform::Type::Int, "Xbr Scale", "XbrScale", 4, 0.f, 5.f});
+    xbrLv2.add_uniform(Upscaler::Uniform{Upscaler::Uniform::Type::Float,
+                                         "Luma Weight",
+                                         "XbrYWeight",
+                                         48.f,
+                                         0.f,
+                                         100.f});
+    xbrLv2.add_uniform(Upscaler::Uniform{Upscaler::Uniform::Type::Float,
+                                         "Color match threshold",
+                                         "XbrEqThreshold",
+                                         30.f,
+                                         0.f,
+                                         50.f});
+    xbrLv2.add_uniform(Upscaler::Uniform{Upscaler::Uniform::Type::Float,
+                                         "Lv 2 coefficient",
+                                         "XbrLv2Coefficient",
+                                         2.f,
+                                         0.f,
+                                         3.f});
 
     int selectedUpscaler = 0;
     bool upscalerComboBoxActive = false;
     bool refreshUpscalee = false;
     bool refreshRenderTarget = false;
+
+    bool darkBackground = false;
+    bool willScreenshot = false;
 
     //--------------------------------------------------------------------------------------
 
@@ -284,15 +343,24 @@ int main(void)
 
     while (!WindowShouldClose()) // Detect window close button or ESC key
     {
-
-        if (IsKeyPressed(KEY_R))
+        if (IsKeyPressed(KEY_TAB) || IsMouseButtonPressed(MOUSE_BUTTON_RIGHT))
         {
-            xbrLv2.reload();
+            uiState = (uiState == UiState::Main) ? UiState::Nothing : UiState::Main;
         }
 
-        if (IsKeyPressed(KEY_TAB))
+        if (IsKeyPressed(KEY_F1))
         {
-            showGui = !showGui;
+            uiState = (uiState == UiState::Help) ? UiState::Nothing : UiState::Help;
+        }
+
+        if (IsKeyPressed(KEY_F2))
+        {
+            darkBackground = !darkBackground;
+        }
+
+        if (IsKeyPressed(KEY_S))
+        {
+            willScreenshot = true;
         }
 
         // Draw
@@ -300,7 +368,7 @@ int main(void)
         {
             BeginDrawing();
 
-            if(IsWindowResized())
+            if (IsWindowResized())
             {
                 screenWidth = GetScreenWidth();
                 screenHeight = GetScreenHeight();
@@ -318,7 +386,7 @@ int main(void)
             }
             else
             {
-                ClearBackground(WHITE);
+                ClearBackground(darkBackground ? DARKGRAY : LIGHTGRAY);
                 AsepriteImage lastImage = std::move(imageServer.lastReadyImage);
                 Image currentImage;
                 currentImage.width = lastImage.width;
@@ -392,7 +460,7 @@ int main(void)
                 DrawTextureEx(upscaledTexture.texture, texturePosition, 0, 1, WHITE);
             }
 
-            if (showGui)
+            if (uiState == UiState::Main)
             {
                 float selectedScale =
                     GuiSliderBar({8, 8, 256, 20}, nullptr, "Scale", float(renderScale), 1, 6);
@@ -412,16 +480,20 @@ int main(void)
                 {
                     upscalerComboBoxActive = !upscalerComboBoxActive;
                 }
+                // The dropdown doesn't have a title, but let's add one just to have
+                // it looking like the rest of the controls.
+                // Ugly hacked coordinates.
+                DrawText("Filter", 268, 45, 10, Fade(GetColor(GuiGetStyle(COMBOBOX, 2)), 1.f));
 
                 if (!upscalerComboBoxActive)
                 {
                     switch (selectedUpscaler)
                     {
                     case 1:
-                        refreshUpscalee |= xbrLv1.draw_settings(24, 72);
+                        refreshUpscalee |= xbrLv1.draw_settings(32, 72);
                         break;
                     case 2:
-                        refreshUpscalee |= xbrLv2.draw_settings(24, 72);
+                        refreshUpscalee |= xbrLv2.draw_settings(32, 72);
                         break;
                     default:;
                     }
@@ -430,6 +502,46 @@ int main(void)
                 if (selectedUpscaler != previousSelection)
                 {
                     refreshUpscalee = true;
+                }
+
+                if (GuiButton({float(screenWidth) - 128 - 16, 8, 64, 20}, "Save!") || willScreenshot)
+                {
+                    Image savedImage = LoadImageFromTexture(upscaledTexture.texture);
+                    ExportImage(savedImage, "result.png");
+                    UnloadImage(savedImage);
+                    willScreenshot = false;
+                }
+
+                if (GuiButton({float(screenWidth) - 128 - 16, 40, 140, 20},
+                              "Toggle background"))
+                {
+                    darkBackground = !darkBackground;
+                }
+
+                if (GuiButton({float(screenWidth) - 64 - 8, 8, 64, 20}, "Help!"))
+                {
+                    uiState = UiState::Help;
+                }
+            }
+            else if (uiState == UiState::Help)
+            {
+                DrawRectangle(0, 0, screenWidth, screenHeight, Color{0, 0, 0, 128});
+                DrawTextBorder("Controls", 16, 18, 30, RAYWHITE, BLACK);
+                DrawTextBorder(
+                    R"END(- F1 to toggle this help
+- F2 to toggle the background's color.
+- Right-click or TAB to toggle the options.
+- S to save the current result.
+- F12 to screenshot.)END",
+                    24,
+                    60,
+                    20,
+                    RAYWHITE,
+                    BLACK);
+
+                if (GuiButton({float(screenWidth) - 64 - 8, 8, 64, 20}, "Back"))
+                {
+                    uiState = UiState::Main;
                 }
             }
 
