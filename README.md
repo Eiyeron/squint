@@ -8,6 +8,9 @@ Squint is a live upscaler companion program for [Aseprite][aseprite] that allows
 - xBR-lv1-noblend (simpler, but less fancy)
 - xBR-lv2 (fancier with extra smoothness and settings)
 
+## Known Issues
+- the xBR-lv2 doesn't compile on Intel HD GPU drivers yet. Please use another GPU driver until I fix that.
+
 ## Usage
 
 ### Aseprite setup
