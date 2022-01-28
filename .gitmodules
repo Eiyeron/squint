@@ -1,0 +1,6 @@
+[submodule "extern/IXWebSocket"]
+	path = extern/IXWebSocket
+	url = https://github.com/machinezone/IXWebSocket.git
+[submodule "extern/raygui"]
+	path = extern/raygui
+	url = https://github.com/raysan5/raygui.git
