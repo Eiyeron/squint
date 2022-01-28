@@ -1,18 +1,20 @@
-#include "raylib.h"
 #include "raygui.h"
-#include <string>
+#include "raylib.h"
+#include <cinttypes>
 #include <cstdint>
 #include <cstdio>
+#include <string>
 
-// [HACK] IXWebsocket includes some of Windows' headers, this manua define sircumvents a link conflict between Raylib's functions and Windows'.
+// [HACK] IXWebsocket includes some of Windows' headers, this manua define
+// circumvents a link conflict between Raylib's functions and Windows'.
 #if defined(_WIN32) || defined(_WIN64)
 #define _WINUSER_
 #define _IMM_
 #define _APISETCONSOLEL3_
 #define _WINGDI_
 #endif
-#include "ixwebsocket/IXWebSocketServer.h"
 #include "ixwebsocket/IXWebSocketMessageType.h"
+#include "ixwebsocket/IXWebSocketServer.h"
 
 bool connected = false;
 
@@ -24,7 +26,7 @@ struct AsepriteImage
 
     AsepriteImage() = default;
 
-    AsepriteImage(AsepriteImage&& other) noexcept
+    AsepriteImage(AsepriteImage &&other) noexcept
         : width(other.width)
         , height(other.height)
         , pixels(std::move(other.pixels))
@@ -33,7 +35,7 @@ struct AsepriteImage
         other.width = 0;
     }
 
-    AsepriteImage& operator=(AsepriteImage&& other) noexcept
+    AsepriteImage &operator=(AsepriteImage &&other) noexcept
     {
         width = other.width;
         height = other.height;
@@ -44,10 +46,8 @@ struct AsepriteImage
     }
 };
 
-
-
 static const char defaultVertexShader[] =
-R"VERTEX(#version 330
+    R"VERTEX(#version 330
 in vec3 vertexPosition;
 in vec2 vertexTexCoord;
 in vec4 vertexColor;
@@ -66,29 +66,41 @@ struct Upscaler
 {
     struct Uniform
     {
+        enum class Type
+        {
+            Float,
+            Int,
+        };
+
+        Type type;
         std::string name;
         std::string uniformName;
         float value;
+        float min;
+        float max;
     };
 
-
-    Upscaler(const char* path)
-        :shaderPath(path)
+    Upscaler(const char *path)
+        : shaderPath(path)
     {
         reload();
     }
-    
+
     ~Upscaler()
     {
-        UnloadShader(shader);
+        if (shader.id != 0)
+        {
+            UnloadShader(shader);
+            shader = {};
+        }
     }
 
     void reload()
     {
-        char* shaderText = LoadFileText(shaderPath.c_str());
+        char *shaderText = LoadFileText(shaderPath.c_str());
         Shader newShader = LoadShaderFromMemory(defaultVertexShader, shaderText);
         UnloadFileText(shaderText);
-        if(newShader.id != 0)
+        if (newShader.id != 0)
         {
             if (shader.id != 0)
             {
@@ -106,12 +118,37 @@ struct Upscaler
     bool draw_settings(float x, float y)
     {
         bool changed = false;
-        for (Uniform& uniform : uniforms)
+        for (Uniform &uniform : uniforms)
         {
-            float newValue = GuiSlider(Rectangle{ x, y, 256.f, 20.f }, nullptr, uniform.name.c_str(), uniform.value, 0, 256.f);
+            float newValue = GuiSlider(Rectangle{x, y, 256.f, 20.f},
+                                       nullptr,
+                                       uniform.name.c_str(),
+                                       uniform.value,
+                                       uniform.min,
+                                       uniform.max);
+            if (uniform.type == Uniform::Type::Int)
+            {
+                newValue = int(newValue);
+            }
+
             if (newValue != uniform.value)
             {
-                SetShaderValue(shader, GetShaderLocation(shader, uniform.uniformName.c_str()), &uniform.value, SHADER_UNIFORM_FLOAT);
+                if (uniform.type == Uniform::Type::Float)
+                {
+                    SetShaderValue(shader,
+                                GetShaderLocation(shader, uniform.uniformName.c_str()),
+                                &uniform.value,
+                                SHADER_UNIFORM_FLOAT);
+                }
+                else
+                {
+                    int intValue = newValue;
+                    SetShaderValue(shader,
+                                GetShaderLocation(shader, uniform.uniformName.c_str()),
+                                &intValue,
+                                SHADER_UNIFORM_INT);
+                }
+
                 uniform.value = newValue;
                 changed = true;
             }
@@ -129,13 +166,13 @@ struct Upscaler
         BeginShaderMode(shader);
         ClearBackground(BLANK);
         // RenderTextures in OpenGL must be flipped on the Y axis.
-        Rectangle src{ 0, 0, float(texture.width), -float(texture.height) };
-        Rectangle dest{ 0, 0, float(output.texture.width), float(output.texture.height) };
-        DrawTexturePro(texture, src, dest, { 0, 0 }, 0.f, WHITE);
+        Rectangle src{0, 0, float(texture.width), -float(texture.height)};
+        Rectangle dest{0, 0, float(output.texture.width), float(output.texture.height)};
+        DrawTexturePro(texture, src, dest, {0, 0}, 0.f, WHITE);
         EndShaderMode();
         EndTextureMode();
-
     }
+
     std::vector<Uniform> uniforms;
     std::string shaderPath;
     Shader shader{};
@@ -146,7 +183,8 @@ struct ImageServer
     AsepriteImage lastReadyImage;
 
     void onMessage(std::shared_ptr<ix::ConnectionState> connectionState,
-        ix::WebSocket& webSocket, const ix::WebSocketMessagePtr& msg)
+                   ix::WebSocket &webSocket,
+                   const ix::WebSocketMessagePtr &msg)
     {
         uint32_t w{}, h{};
         switch (msg->type)
@@ -160,10 +198,13 @@ struct ImageServer
         case ix::WebSocketMessageType::Message:
             if (msg->binary)
             {
-                uint32_t* hdr = (uint32_t*)msg->str.c_str();
-                unsigned char* data = (unsigned char*)(msg->str.c_str()) + 3 * sizeof(uint32_t);
 
-                if (hdr[0] == 'I') {
+                unsigned long *hdr = (unsigned long *)msg->str.c_str();
+                unsigned char *data =
+                    (unsigned char *)(msg->str.c_str()) + 3 * sizeof(unsigned long);
+
+                if (hdr[0] == 'I')
+                {
                     AsepriteImage newImage;
                     newImage.width = hdr[1];
                     newImage.height = hdr[2];
@@ -181,9 +222,6 @@ struct ImageServer
                     }
                     lastReadyImage = std::move(newImage);
                 }
-
-
-
             }
             break;
         default:
@@ -191,39 +229,6 @@ struct ImageServer
         }
     }
 };
-
-// async callback
-void handleMessage(std::shared_ptr<ix::ConnectionState> connectionState,
-    ix::WebSocket& webSocket, const ix::WebSocketMessagePtr& msg)
-{
-    unsigned long w, h;
-    switch (msg->type)
-    {
-    case ix::WebSocketMessageType::Close:
-        connected = false;
-        break;
-    case ix::WebSocketMessageType::Open:
-        connected = true;
-        break;
-    case ix::WebSocketMessageType::Message:
-        if (msg->binary)
-        {
-            unsigned long* hdr = (unsigned long*)msg->str.c_str();
-            unsigned char* data = (unsigned char*)msg->str.c_str() + 3 * sizeof(unsigned long);
-
-            if (hdr[0] == 'I') {
-                w = hdr[1];
-                h = hdr[2];
-                printf("Got an image data : %u %u", w, h);
-            }
-
-        }
-        break;
-    default:
-        break;
-    }
-}
-
 
 int main(void)
 {
@@ -240,53 +245,47 @@ int main(void)
     ix::initNetSystem();
     ix::WebSocketServer serv(34613);
     serv.disablePerMessageDeflate();
-    serv.setOnClientMessageCallback([&imageServer](std::shared_ptr<ix::ConnectionState> connectionState,
-        ix::WebSocket& webSocket, const ix::WebSocketMessagePtr& msg)
-        {
+    serv.setOnClientMessageCallback(
+        [&imageServer](std::shared_ptr<ix::ConnectionState> connectionState,
+                       ix::WebSocket &webSocket,
+                       const ix::WebSocketMessagePtr &msg) {
             imageServer.onMessage(connectionState, webSocket, msg);
         });
-    //serv.setOnClientMessageCallback(&handleMessage);
 
     serv.listenAndStart();
 
     InitWindow(screenWidth, screenHeight, "Squint live viewer");
 
-    SetTargetFPS(60);               // Set our game to run at 60 frames-per-second
+    SetTargetFPS(60); // Set our game to run at 60 frames-per-second
 
-    //Image currentImage{};
     Texture2D currentTexture{};
     RenderTexture2D upscaledTexture{};
 
-    enum class XbrVersion
-    {
-        LV1,
-        LV2
-    };
-    XbrVersion selectedVersion = XbrVersion::LV1;
-
     Upscaler xbrLv1("../xbr-lv1.frag");
-    xbrLv1.add_uniform(Upscaler::Uniform{ "Luma Weight", "XbrYWeight", 48.f });
-    xbrLv1.add_uniform(Upscaler::Uniform{ "Color match threshold", "XbrEqThreshold", 30.f });
-    //Upscaler xbrLv2("../xbr-lv2.frag");
+    xbrLv1.add_uniform(Upscaler::Uniform{Upscaler::Uniform::Type::Float, "Luma Weight", "XbrYWeight", 48.f, 0.f, 100.f});
+    xbrLv1.add_uniform(Upscaler::Uniform{Upscaler::Uniform::Type::Float, "Color match threshold", "XbrEqThreshold", 30.f, 0.f, 50.f});
+    Upscaler xbrLv2("../xbr-lv2.frag");
+    xbrLv2.add_uniform(Upscaler::Uniform{Upscaler::Uniform::Type::Int, "Xbr Scale", "XbrScale", 4, 0.f, 5.f});
+    xbrLv2.add_uniform(Upscaler::Uniform{Upscaler::Uniform::Type::Float, "Luma Weight", "XbrYWeight", 48.f, 0.f, 100.f});
+    xbrLv2.add_uniform(Upscaler::Uniform{Upscaler::Uniform::Type::Float, "Color match threshold", "XbrEqThreshold", 30.f, 0.f, 50.f});
+    xbrLv2.add_uniform(Upscaler::Uniform{Upscaler::Uniform::Type::Float, "Lv 2 coefficient", "XbrLv2Coefficient", 2.f, 0.f, 3.f});
 
     int selectedUpscaler = 0;
     bool upscalerComboBoxActive = false;
     bool refreshUpscalee = false;
     bool refreshRenderTarget = false;
 
-
     //--------------------------------------------------------------------------------------
 
     // Main game loop
     int renderScale = 5;
 
-
-    while (!WindowShouldClose())    // Detect window close button or ESC key
+    while (!WindowShouldClose()) // Detect window close button or ESC key
     {
 
         if (IsKeyPressed(KEY_R))
         {
-            xbrLv1.reload();
+            xbrLv2.reload();
         }
 
         if (IsKeyPressed(KEY_TAB))
@@ -302,7 +301,8 @@ int main(void)
             if (!connected)
             {
                 ClearBackground(GRAY);
-                Vector2 size = MeasureTextEx(GetFontDefault(), "Waiting for connection.", 20, 0);
+                Vector2 size =
+                    MeasureTextEx(GetFontDefault(), "Waiting for connection.", 20, 0);
                 Vector2 pos;
                 pos.x = (screenWidth - size.x) / 2;
                 pos.y = (screenHeight - size.y) / 2;
@@ -322,7 +322,8 @@ int main(void)
                 if ((lastImage.width != 0 && lastImage.height != 0))
                 {
                     refreshUpscalee = true;
-                    bool sizeMismatch = lastImage.width != currentTexture.width || lastImage.height != currentTexture.height;
+                    bool sizeMismatch = lastImage.width != currentTexture.width ||
+                                        lastImage.height != currentTexture.height;
                     // Regenerate the base texture
                     if (sizeMismatch)
                     {
@@ -341,62 +342,52 @@ int main(void)
                     refreshRenderTarget = false;
                     UnloadRenderTexture(upscaledTexture);
 
-                    upscaledTexture = LoadRenderTexture(currentTexture.width * renderScale, currentTexture.height * renderScale);
+                    upscaledTexture = LoadRenderTexture(currentTexture.width * renderScale,
+                                                        currentTexture.height * renderScale);
                     SetTextureFilter(currentTexture, TEXTURE_FILTER_POINT);
                     SetTextureFilter(upscaledTexture.texture, TEXTURE_FILTER_POINT);
                 }
-
 
                 if (refreshUpscalee)
                 {
                     refreshUpscalee = false;
                     switch (selectedUpscaler)
                     {
-                    case 0:
-                    {
+                    case 0: {
                         BeginTextureMode(upscaledTexture);
                         ClearBackground(BLANK);
                         // RenderTextures in OpenGL must be flipped on the Y axis.
-                        Rectangle src{ 0, 0, float(currentTexture.width), -float(currentTexture.height) };
-                        Rectangle dest{ 0, 0, float(upscaledTexture.texture.width), float(upscaledTexture.texture.height) };
-                        DrawTexturePro(currentTexture, src, dest, { 0, 0 }, 0.f, WHITE);
+                        Rectangle src{0,
+                                      0,
+                                      float(currentTexture.width),
+                                      -float(currentTexture.height)};
+                        Rectangle dest{0,
+                                       0,
+                                       float(upscaledTexture.texture.width),
+                                       float(upscaledTexture.texture.height)};
+                        DrawTexturePro(currentTexture, src, dest, {0, 0}, 0.f, WHITE);
                         EndTextureMode();
                     }
                     break;
                     case 1:
                         xbrLv1.draw(currentTexture, upscaledTexture);
                         break;
+                    case 2:
+                        xbrLv2.draw(currentTexture, upscaledTexture);
+                        break;
                     }
-
                 }
 
-
-                Vector2 texturePosition{
-                    (screenWidth - upscaledTexture.texture.width) / 2.f,
-                    (screenHeight - upscaledTexture.texture.height) / 2.f
-                };
+                Vector2 texturePosition{(screenWidth - upscaledTexture.texture.width) / 2.f,
+                                        (screenHeight - upscaledTexture.texture.height) / 2.f};
 
                 DrawTextureEx(upscaledTexture.texture, texturePosition, 0, 1, WHITE);
-
             }
 
             if (showGui)
             {
-                switch (selectedUpscaler)
-                {
-                case 1:
-                    refreshUpscalee =  xbrLv1.draw_settings(24, 72);
-                    break;
-                default:;
-
-                }
-
-                int previousSelection = selectedUpscaler;
-                if (GuiDropdownBox({ 8, 8, 256, 20 }, "- None -;XBR-lv1;XBR-lv2", &selectedUpscaler, upscalerComboBoxActive))
-                {
-                    upscalerComboBoxActive = !upscalerComboBoxActive;
-                }
-                float selectedScale = GuiSliderBar({ 8, 40, 256, 20 }, nullptr, "Scale", float(renderScale), 1, 6);
+                float selectedScale =
+                    GuiSliderBar({8, 8, 256, 20}, nullptr, "Scale", float(renderScale), 1, 6);
                 if (int(selectedScale) != renderScale)
                 {
                     renderScale = int(selectedScale);
@@ -404,15 +395,36 @@ int main(void)
                     refreshUpscalee = true;
                 }
 
+                int previousSelection = selectedUpscaler;
+                if (GuiDropdownBox({8, 40, 256, 20},
+                                   "- None -;XBR-lv1;XBR-lv2",
+                                   &selectedUpscaler,
+                                   upscalerComboBoxActive))
+                {
+                    upscalerComboBoxActive = !upscalerComboBoxActive;
+                }
+
+                if (!upscalerComboBoxActive)
+                {
+                    switch (selectedUpscaler)
+                    {
+                    case 1:
+                        refreshUpscalee = xbrLv1.draw_settings(24, 72);
+                        break;
+                    case 2:
+                        refreshUpscalee = xbrLv2.draw_settings(24, 72);
+                        break;
+                    default:;
+                    }
+                }
+
                 if (selectedUpscaler != previousSelection)
                 {
                     refreshUpscalee = true;
                 }
-
             }
 
             EndDrawing();
-
         }
         //----------------------------------------------------------------------------------
     }
@@ -425,7 +437,7 @@ int main(void)
     UnloadRenderTexture(upscaledTexture);
     UnloadTexture(currentTexture);
 
-    CloseWindow();        // Close window and OpenGL context
+    CloseWindow(); // Close window and OpenGL context
     //--------------------------------------------------------------------------------------
 
     return 0;
