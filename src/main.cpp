@@ -319,7 +319,7 @@ int main(void)
     RenderTexture2D upscaledTexture{};
 
     // [TODO] Move the binary genreation out of build/ and the shaders into their own folders for an easier release process.
-    Upscaler xbrLv1("../xbr-lv1.frag");
+    Upscaler xbrLv1("shaders/xbr-lv1.frag");
     xbrLv1.addUniform(Upscaler::Uniform{Upscaler::Uniform::Type::Float,
                                          "Luma Weight",
                                          "XbrYWeight",
@@ -332,7 +332,7 @@ int main(void)
                                          30.f,
                                          0.f,
                                          50.f});
-    Upscaler xbrLv2("../xbr-lv2.frag");
+    Upscaler xbrLv2("shaders/xbr-lv2.frag");
     xbrLv2.addUniform(
         Upscaler::Uniform{Upscaler::Uniform::Type::Int, "Xbr Scale", "XbrScale", 4, 0.f, 5.f});
     xbrLv2.addUniform(Upscaler::Uniform{Upscaler::Uniform::Type::Float,
