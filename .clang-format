@@ -1,0 +1,18 @@
+﻿---
+BasedOnStyle: Microsoft
+AllowAllArgumentsOnNextLine: 'false'
+AllowAllConstructorInitializersOnNextLine: 'false'
+AllowAllParametersOfDeclarationOnNextLine: 'false'
+AllowShortBlocksOnASingleLine: 'false'
+AllowShortCaseLabelsOnASingleLine: 'false'
+AllowShortFunctionsOnASingleLine: None
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLambdasOnASingleLine: None
+AllowShortLoopsOnASingleLine: 'false'
+BinPackArguments: 'false'
+BinPackParameters: 'false'
+BreakConstructorInitializers: BeforeComma
+ColumnLimit: '96'
+FixNamespaceComments: 'true'
+
+...
