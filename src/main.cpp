@@ -103,6 +103,15 @@ struct Upscaler
         }
     }
 
+    void unloadShader()
+    {
+        if (shader.id != 0)
+        {
+            UnloadShader(shader);
+            shader = {};
+        }
+    }
+
     void reload()
     {
         char *shaderText = LoadFileText(shaderPath.c_str());
@@ -118,14 +127,30 @@ struct Upscaler
         }
     }
 
-    void add_uniform(Uniform uniform)
+    void addUniform(Uniform uniform)
     {
         uniforms.push_back(uniform);
     }
 
-    bool draw_settings(float x, float y)
+    int getTextWidth() const
+    {
+        int maxTextWidth = 0;
+        for (const Uniform &uniform : uniforms)
+        {
+            int textWidth = MeasureText(uniform.name.c_str(), 10);
+            if (textWidth > maxTextWidth)
+            {
+                maxTextWidth = textWidth;
+            }
+        }
+
+        return maxTextWidth;
+    }
+
+    bool drawSettings(float x, float y)
     {
         bool changed = false;
+
         for (Uniform &uniform : uniforms)
         {
             float newValue = GuiSlider(Rectangle{x, y, 256.f, 20.f},
@@ -294,34 +319,34 @@ int main(void)
     RenderTexture2D upscaledTexture{};
 
     Upscaler xbrLv1("../xbr-lv1.frag");
-    xbrLv1.add_uniform(Upscaler::Uniform{Upscaler::Uniform::Type::Float,
+    xbrLv1.addUniform(Upscaler::Uniform{Upscaler::Uniform::Type::Float,
                                          "Luma Weight",
                                          "XbrYWeight",
                                          48.f,
                                          0.f,
                                          100.f});
-    xbrLv1.add_uniform(Upscaler::Uniform{Upscaler::Uniform::Type::Float,
+    xbrLv1.addUniform(Upscaler::Uniform{Upscaler::Uniform::Type::Float,
                                          "Color match threshold",
                                          "XbrEqThreshold",
                                          30.f,
                                          0.f,
                                          50.f});
     Upscaler xbrLv2("../xbr-lv2.frag");
-    xbrLv2.add_uniform(
+    xbrLv2.addUniform(
         Upscaler::Uniform{Upscaler::Uniform::Type::Int, "Xbr Scale", "XbrScale", 4, 0.f, 5.f});
-    xbrLv2.add_uniform(Upscaler::Uniform{Upscaler::Uniform::Type::Float,
+    xbrLv2.addUniform(Upscaler::Uniform{Upscaler::Uniform::Type::Float,
                                          "Luma Weight",
                                          "XbrYWeight",
                                          48.f,
                                          0.f,
                                          100.f});
-    xbrLv2.add_uniform(Upscaler::Uniform{Upscaler::Uniform::Type::Float,
+    xbrLv2.addUniform(Upscaler::Uniform{Upscaler::Uniform::Type::Float,
                                          "Color match threshold",
                                          "XbrEqThreshold",
                                          30.f,
                                          0.f,
                                          50.f});
-    xbrLv2.add_uniform(Upscaler::Uniform{Upscaler::Uniform::Type::Float,
+    xbrLv2.addUniform(Upscaler::Uniform{Upscaler::Uniform::Type::Float,
                                          "Lv 2 coefficient",
                                          "XbrLv2Coefficient",
                                          2.f,
@@ -386,7 +411,7 @@ int main(void)
             }
             else
             {
-                ClearBackground(darkBackground ? DARKGRAY : LIGHTGRAY);
+                ClearBackground(darkBackground ? DARKGRAY : WHITE);
                 AsepriteImage lastImage = std::move(imageServer.lastReadyImage);
                 Image currentImage;
                 currentImage.width = lastImage.width;
@@ -462,6 +487,31 @@ int main(void)
 
             if (uiState == UiState::Main)
             {
+                int maxTextWidth = 0;
+                int numFields = 0;
+                {
+                    if (selectedUpscaler == 0)
+                    {
+                        maxTextWidth = MeasureText("Filter", 10);
+                    }
+                    else if (selectedUpscaler == 1)
+                    {
+                        maxTextWidth = xbrLv1.getTextWidth() + 32.f;
+                        numFields = xbrLv1.uniforms.size();
+                    }
+                    else if (selectedUpscaler == 2)
+                    {
+                        maxTextWidth = xbrLv2.getTextWidth() + 32.f;
+                        numFields = xbrLv2.uniforms.size();
+                    }
+                }
+
+                DrawRectangle(0,
+                              0,
+                              256.f + 16.f + maxTextWidth,
+                              32.f * numFields + 18 + 48.f,
+                              Color{255, 255, 255, 192});
+
                 float selectedScale =
                     GuiSliderBar({8, 8, 256, 20}, nullptr, "Scale", float(renderScale), 1, 6);
                 int integerScale = roundf(selectedScale);
@@ -490,10 +540,10 @@ int main(void)
                     switch (selectedUpscaler)
                     {
                     case 1:
-                        refreshUpscalee |= xbrLv1.draw_settings(32, 72);
+                        refreshUpscalee |= xbrLv1.drawSettings(32, 72);
                         break;
                     case 2:
-                        refreshUpscalee |= xbrLv2.draw_settings(32, 72);
+                        refreshUpscalee |= xbrLv2.drawSettings(32, 72);
                         break;
                     default:;
                     }
@@ -504,7 +554,8 @@ int main(void)
                     refreshUpscalee = true;
                 }
 
-                if (GuiButton({float(screenWidth) - 128 - 16, 8, 64, 20}, "Save!") || willScreenshot)
+                if (GuiButton({float(screenWidth) - 128 - 16, 8, 64, 20}, "Save!") ||
+                    willScreenshot)
                 {
                     Image savedImage = LoadImageFromTexture(upscaledTexture.texture);
                     ExportImage(savedImage, "result.png");
@@ -512,7 +563,7 @@ int main(void)
                     willScreenshot = false;
                 }
 
-                if (GuiButton({float(screenWidth) - 128 - 16, 40, 140, 20},
+                if (GuiButton({float(screenWidth) - 128 - 16, 40, 137, 20},
                               "Toggle background"))
                 {
                     darkBackground = !darkBackground;
@@ -526,7 +577,7 @@ int main(void)
             else if (uiState == UiState::Help)
             {
                 DrawRectangle(0, 0, screenWidth, screenHeight, Color{0, 0, 0, 128});
-                DrawTextBorder("Controls", 16, 18, 30, RAYWHITE, BLACK);
+                DrawTextBorder("Controls", 16, 18, 30, WHITE, BLACK);
                 DrawTextBorder(
                     R"END(- F1 to toggle this help
 - F2 to toggle the background's color.
@@ -536,7 +587,7 @@ int main(void)
                     24,
                     60,
                     20,
-                    RAYWHITE,
+                    WHITE,
                     BLACK);
 
                 if (GuiButton({float(screenWidth) - 64 - 8, 8, 64, 20}, "Back"))
@@ -555,6 +606,9 @@ int main(void)
 
     // De-Initialization
     //--------------------------------------------------------------------------------------
+    // Manual shader unload to avoid crashes due to unload order.
+    xbrLv1.unloadShader();
+    xbrLv2.unloadShader();
     UnloadRenderTexture(upscaledTexture);
     UnloadTexture(currentTexture);
 
