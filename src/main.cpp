@@ -312,47 +312,49 @@ int main(void)
     InitWindow(screenWidth, screenHeight, "Squint live viewer");
     SetExitKey(KEY_NULL);
     SetWindowState(FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT);
+    SetWindowMinSize(256, 256);
 
     SetTargetFPS(60); // Set our game to run at 60 frames-per-second
 
     Texture2D currentTexture{};
     RenderTexture2D upscaledTexture{};
 
-    // [TODO] Move the binary genreation out of build/ and the shaders into their own folders for an easier release process.
+    // [TODO] Move the binary genreation out of build/ and the shaders into their own folders
+    // for an easier release process.
     Upscaler xbrLv1("shaders/xbr-lv1.frag");
     xbrLv1.addUniform(Upscaler::Uniform{Upscaler::Uniform::Type::Float,
-                                         "Luma Weight",
-                                         "XbrYWeight",
-                                         48.f,
-                                         0.f,
-                                         100.f});
+                                        "Luma Weight",
+                                        "XbrYWeight",
+                                        48.f,
+                                        0.f,
+                                        100.f});
     xbrLv1.addUniform(Upscaler::Uniform{Upscaler::Uniform::Type::Float,
-                                         "Color match threshold",
-                                         "XbrEqThreshold",
-                                         30.f,
-                                         0.f,
-                                         50.f});
+                                        "Color match threshold",
+                                        "XbrEqThreshold",
+                                        30.f,
+                                        0.f,
+                                        50.f});
     Upscaler xbrLv2("shaders/xbr-lv2.frag");
     xbrLv2.addUniform(
         Upscaler::Uniform{Upscaler::Uniform::Type::Int, "Xbr Scale", "XbrScale", 4, 0.f, 5.f});
     xbrLv2.addUniform(Upscaler::Uniform{Upscaler::Uniform::Type::Float,
-                                         "Luma Weight",
-                                         "XbrYWeight",
-                                         48.f,
-                                         0.f,
-                                         100.f});
+                                        "Luma Weight",
+                                        "XbrYWeight",
+                                        48.f,
+                                        0.f,
+                                        100.f});
     xbrLv2.addUniform(Upscaler::Uniform{Upscaler::Uniform::Type::Float,
-                                         "Color match threshold",
-                                         "XbrEqThreshold",
-                                         30.f,
-                                         0.f,
-                                         50.f});
+                                        "Color match threshold",
+                                        "XbrEqThreshold",
+                                        30.f,
+                                        0.f,
+                                        50.f});
     xbrLv2.addUniform(Upscaler::Uniform{Upscaler::Uniform::Type::Float,
-                                         "Lv 2 coefficient",
-                                         "XbrLv2Coefficient",
-                                         2.f,
-                                         0.f,
-                                         3.f});
+                                        "Lv 2 coefficient",
+                                        "XbrLv2Coefficient",
+                                        2.f,
+                                        0.f,
+                                        3.f});
 
     int selectedUpscaler = 0;
     bool upscalerComboBoxActive = false;
@@ -555,13 +557,9 @@ int main(void)
                     refreshUpscalee = true;
                 }
 
-                if (GuiButton({float(screenWidth) - 128 - 16, 8, 64, 20}, "Save!") ||
-                    willScreenshot)
+                if (GuiButton({float(screenWidth) - 128 - 16, 8, 64, 20}, "Save!"))
                 {
-                    Image savedImage = LoadImageFromTexture(upscaledTexture.texture);
-                    ExportImage(savedImage, "result.png");
-                    UnloadImage(savedImage);
-                    willScreenshot = false;
+                    willScreenshot = true;
                 }
 
                 if (GuiButton({float(screenWidth) - 128 - 16, 40, 137, 20},
@@ -595,6 +593,14 @@ int main(void)
                 {
                     uiState = UiState::Main;
                 }
+            }
+
+            if (willScreenshot)
+            {
+                Image savedImage = LoadImageFromTexture(upscaledTexture.texture);
+                ExportImage(savedImage, "saved.png");
+                UnloadImage(savedImage);
+                willScreenshot = false;
             }
 
             EndDrawing();
