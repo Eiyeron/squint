@@ -46,13 +46,9 @@ void main()
    -- Adaptation to GLSL + texelFetch by Florian Dormont
 */
 
+uniform int XbrCornerMode = 2;
 uniform float XbrYWeight = 48.;
 uniform float XbrEqThreshold = 30.;
-
-// Uncomment just one of the three params below to choose the corner detection
-//#define CORNER_A
-//#define CORNER_B
-#define CORNER_C
 
 const mat3 yuv = mat3(0.299, 0.587, 0.114, -0.169, -0.331, 0.499, 0.499, -0.418, -0.0813);
 
@@ -87,12 +83,15 @@ float weighted_distance(float a, float b, float c, float d, float e, float f, fl
     Consider E as the central pixel. xBR LVL1 needs only to look at 12 texture pixels.
 */
 
+// Purposedly returns a pixel with a magenta color so out of bounds to use it as
+// an alpha mask.
+// [TODO] Maybe use instead an external boolean flag?
 vec3 fetchOrMagenta(in sampler2D tex, in ivec2 texel_coords)
 {
     vec4 texel = texelFetch(tex, texel_coords, 0);
     if ((texel.a) == 0)
     {
-        return vec3(10, 0, 10);
+        return vec3(1000,1000,1000);
     }
     return texel.rgb;
 }
@@ -144,20 +143,26 @@ vec4 main_fragment(in sampler2D base_texture,
 
     fx = (dot(dir, pos) > 0.5);
 
-// It uses CORNER_C if none of the others are defined.
-#ifdef CORNER_A
-    interp_restriction_lv1 = ((e != f) && (e != h));
-#elif CORNER_B
-    interp_restriction_lv1 = ((e != f) && (e != h) &&
-                              (!eq(f, b) && !eq(h, d) || eq(e, i) && !eq(f, i4) && !eq(h, i5) ||
-                               eq(e, g) || eq(e, c)));
-#else
-    interp_restriction_lv1 =
-        ((e != f) && (e != h) &&
-         (!eq(f, b) && !eq(f, c) || !eq(h, d) && !eq(h, g) ||
-          eq(e, i) && (!eq(f, f4) && !eq(f, i4) || !eq(h, h5) && !eq(h, i5)) || eq(e, g) ||
-          eq(e, c)));
-#endif
+    if (XbrCornerMode == 0)
+    {
+        interp_restriction_lv1 = ((e != f) && (e != h));
+
+    }
+    else if (XbrCornerMode == 1)
+    {
+        interp_restriction_lv1 = ((e != f) && (e != h) &&
+                                (!eq(f, b) && !eq(h, d) || eq(e, i) && !eq(f, i4) && !eq(h, i5) ||
+                                eq(e, g) || eq(e, c)));
+    }
+    else
+    {
+        interp_restriction_lv1 =
+            ((e != f) && (e != h) &&
+            (!eq(f, b) && !eq(f, c) || !eq(h, d) && !eq(h, g) ||
+            eq(e, i) && (!eq(f, f4) && !eq(f, i4) || !eq(h, h5) && !eq(h, i5)) || eq(e, g) ||
+            eq(e, c)));
+    }
+
     edr = (weighted_distance(e, c, g, i, h5, f4, h, f) <
            weighted_distance(h, d, i5, f, i4, b, e, i)) &&
           interp_restriction_lv1;

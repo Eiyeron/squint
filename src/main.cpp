@@ -91,6 +91,7 @@ int main(void)
     // Prepare the shaders.
     // xBR-lv1 (no blend version)
     Upscaler xbrLv1("shaders/xbr-lv1.frag");
+    xbrLv1.addUniform(Uniform{Uniform::Type::Int, "Corner mode", "XbrCornerMode", 2, 0.f, 2.f});
     xbrLv1.addUniform(
         Uniform{Uniform::Type::Float, "Luma Weight", "XbrYWeight", 48.f, 0.f, 100.f});
     xbrLv1.addUniform(Uniform{Uniform::Type::Float,
