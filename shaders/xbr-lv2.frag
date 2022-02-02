@@ -47,16 +47,11 @@ void main()
    -- Adaptation to GLSL + texelFetch by Florian Dormont
 */
 
+uniform int XbrCornerMode = 0;
 uniform int XbrScale = 4;
 uniform float XbrYWeight = 48.;
 uniform float XbrEqThreshold = 25.;
 uniform float XbrLv2Coefficient = 2.;
-
-// Uncomment just one of the three params below to choose the corner detection
-#define CORNER_A
-//#define CORNER_B
-//#define CORNER_C
-//#define CORNER_D
 
 const vec4 Ao = vec4(1.0, -1.0, -1.0, 1.0);
 const vec4 Bo = vec4(1.0, 1.0, -1.0, -1.0);
@@ -196,85 +191,90 @@ vec4 main_fragment(in sampler2D base_texture,
     interp_restriction_lv0 = comp_and(notEqual(e, f), notEqual(e, h));
     interp_restriction_lv1 = interp_restriction_lv0;
 
-#ifdef CORNER_B
-// Kept for reference
-//    interp_restriction_lv1 = (interp_restriction_lv0 &&
-//                              (!eq(f, b) && !eq(h, d) || eq(e, i) && !eq(f, i4) && !eq(h, i5) ||
-//                               eq(e, g) || eq(e, c)));
-
-    bvec4 interp_rule_1 = comp_and(comp_neg(eq(f, b)), comp_neg(eq(h, d)));
-    bvec4 interp_rule_2 = comp_and(
-                            comp_and(
-                                eq(e, i),
-                                comp_neg(eq(f, i4))),
-                            comp_neg(eq(h, i5)));
-    bvec4 interp_rule_3 = eq(e, g);
-    bvec4 interp_rule_4 = eq(e, c);
-    bvec4 interp_rule = comp_or(interp_rule_1, interp_rule_2);
-    interp_rule = comp_or(interp_rule, interp_rule_3);
-    interp_rule = comp_or(interp_rule, interp_rule_4);
-
-    interp_restriction_lv1 = comp_and(interp_restriction_lv0, interp_rule);
-#endif
-#ifdef CORNER_D
-// Kept for reference
-//    interp_restriction_lv1 = (interp_restriction_lv0 &&
-//                              (!eq(f, b) && !eq(h, d) || eq(e, i) && !eq(f, i4) && !eq(h, i5) ||
-//                               eq(e, g) || eq(e, c)) &&
-//                              (f != f4 && f != i || h != h5 && h != i || h != g || f != c ||
-//                               eq(b, c1) && eq(d, g0)));
-//
-    vec4 c1 = i4.yzwx;
-    vec4 g0 = i5.wxyz;
-    bvec4 interp_rule_1 = comp_and(comp_neg(eq(f, b)), comp_neg(eq(h, d)));
-    bvec4 interp_rule_2 = comp_and(
-                            comp_and(
-                                eq(e, i),
-                                comp_neg(eq(f, i4))),
-                            comp_neg(eq(h, i5)));
-    bvec4 interp_rule_3 = eq(e, g);
-    bvec4 interp_rule_4 = eq(e, c);
+    if (XbrCornerMode == 1)
     {
-
-        bool match_1 = f != f4 && f != i;
-        bool match_2 = h != h5 && h != i;
-        bool match_3 = h != g;
-        bool match_4 = f != c;
-        bvec4 match_5 = comp_and(eq(b, c1), eq(d, g0));
-
-        bvec4 interm = comp_or(bvec4(match_1), bvec4(match_2));
-        interm = comp_or(interm, bvec4(match_3));
-        interm = comp_or(interm, bvec4(match_4));
-        interp_rule_4 = comp_and(interp_rule_4, interm);
-    }    
-#endif
-#ifdef CORNER_C
 // Kept for reference
-//    interp_restriction_lv1 =
-//        (interp_restriction_lv0 &&
-//         (!eq(f, b) && !eq(f, c) || !eq(h, d) && !eq(h, g) ||
-//          eq(e, i) && (!eq(f, f4) && !eq(f, i4) || !eq(h, h5) && !eq(h, i5)) || eq(e, g) ||
-//          eq(e, c)));
+//        interp_restriction_lv1 = (interp_restriction_lv0 &&
+//                                  (!eq(f, b) && !eq(h, d) || eq(e, i) && !eq(f, i4) && !eq(h, i5) ||
+//                                   eq(e, g) || eq(e, c)));
 
-    bvec4 match_1 = comp_and(comp_neg(eq(f, b)), comp_neg(eq(f, c)));
-    bvec4 match_2 = comp_and(comp_neg(eq(h, d)), comp_neg(eq(h, g)));
+        bvec4 interp_rule_1 = comp_and(comp_neg(eq(f, b)), comp_neg(eq(h, d)));
+        bvec4 interp_rule_2 = comp_and(
+                                comp_and(
+                                    eq(e, i),
+                                    comp_neg(eq(f, i4))),
+                                comp_neg(eq(h, i5)));
+        bvec4 interp_rule_3 = eq(e, g);
+        bvec4 interp_rule_4 = eq(e, c);
+        bvec4 interp_rule = comp_or(interp_rule_1, interp_rule_2);
+        interp_rule = comp_or(interp_rule, interp_rule_3);
+        interp_rule = comp_or(interp_rule, interp_rule_4);
 
-        bvec4 match_3a = eq(e, i);
-        bvec4 match_3b = comp_and(comp_neg(eq(f, f4)), comp_neg(eq(f, i4)));
-    bvec4 match_3 = comp_and(match_3a, match_3b);
+        interp_restriction_lv1 = comp_and(interp_restriction_lv0, interp_rule);
+    }
 
-    bvec4 match_4 = comp_and(comp_neg(eq(h, h5)), comp_neg(eq(h, i5)));
-    bvec4 match_5 = eq(e, g);
-    bvec4 match_6 = eq(e, c);
+    if (XbrCornerMode == 3)
+    {
+// Kept for reference
+//        interp_restriction_lv1 = (interp_restriction_lv0 &&
+//                                  (!eq(f, b) && !eq(h, d) || eq(e, i) && !eq(f, i4) && !eq(h, i5) ||
+//                                   eq(e, g) || eq(e, c)) &&
+//                                  (f != f4 && f != i || h != h5 && h != i || h != g || f != c ||
+//                                   eq(b, c1) && eq(d, g0)));
+//
+        vec4 c1 = i4.yzwx;
+        vec4 g0 = i5.wxyz;
+        bvec4 interp_rule_1 = comp_and(comp_neg(eq(f, b)), comp_neg(eq(h, d)));
+        bvec4 interp_rule_2 = comp_and(
+                                comp_and(
+                                    eq(e, i),
+                                    comp_neg(eq(f, i4))),
+                                comp_neg(eq(h, i5)));
+        bvec4 interp_rule_3 = eq(e, g);
+        bvec4 interp_rule_4 = eq(e, c);
+        {
+
+            bool match_1 = f != f4 && f != i;
+            bool match_2 = h != h5 && h != i;
+            bool match_3 = h != g;
+            bool match_4 = f != c;
+            bvec4 match_5 = comp_and(eq(b, c1), eq(d, g0));
+
+            bvec4 interm = comp_or(bvec4(match_1), bvec4(match_2));
+            interm = comp_or(interm, bvec4(match_3));
+            interm = comp_or(interm, bvec4(match_4));
+            interp_rule_4 = comp_and(interp_rule_4, interm);
+        }
+    }
+
+   if (XbrCornerMode == 2)
+    {
+// Kept for reference
+//        interp_restriction_lv1 =
+//            (interp_restriction_lv0 &&
+//             (!eq(f, b) && !eq(f, c) || !eq(h, d) && !eq(h, g) ||
+//              eq(e, i) && (!eq(f, f4) && !eq(f, i4) || !eq(h, h5) && !eq(h, i5)) || eq(e, g) ||
+//              eq(e, c)));
+
+        bvec4 match_1 = comp_and(comp_neg(eq(f, b)), comp_neg(eq(f, c)));
+        bvec4 match_2 = comp_and(comp_neg(eq(h, d)), comp_neg(eq(h, g)));
+
+            bvec4 match_3a = eq(e, i);
+            bvec4 match_3b = comp_and(comp_neg(eq(f, f4)), comp_neg(eq(f, i4)));
+        bvec4 match_3 = comp_and(match_3a, match_3b);
+
+        bvec4 match_4 = comp_and(comp_neg(eq(h, h5)), comp_neg(eq(h, i5)));
+        bvec4 match_5 = eq(e, g);
+        bvec4 match_6 = eq(e, c);
 
 
-    interp_restriction_lv1 = comp_or(match_1, match_2);
-    interp_restriction_lv1 = comp_or(interp_restriction_lv1, match_3);
-    interp_restriction_lv1 = comp_or(interp_restriction_lv1, match_4);
-    interp_restriction_lv1 = comp_or(interp_restriction_lv1, match_5);
-    interp_restriction_lv1 = comp_or(interp_restriction_lv1, match_6);
-    interp_restriction_lv1 = comp_and(interp_restriction_lv0, interp_restriction_lv1);
-#endif
+        interp_restriction_lv1 = comp_or(match_1, match_2);
+        interp_restriction_lv1 = comp_or(interp_restriction_lv1, match_3);
+        interp_restriction_lv1 = comp_or(interp_restriction_lv1, match_4);
+        interp_restriction_lv1 = comp_or(interp_restriction_lv1, match_5);
+        interp_restriction_lv1 = comp_or(interp_restriction_lv1, match_6);
+        interp_restriction_lv1 = comp_and(interp_restriction_lv0, interp_restriction_lv1);
+    }
 
     interp_restriction_lv2_left = comp_and(notEqual(e, g), notEqual(d, g));
     interp_restriction_lv2_up = comp_and(notEqual(e, c), notEqual(b, c));
@@ -285,49 +285,48 @@ vec4 main_fragment(in sampler2D base_texture,
 
     edri = comp_and(lessThanEqual(wd1, wd2), interp_restriction_lv0);
     edr = comp_and(lessThan(wd1, wd2), interp_restriction_lv1);
-#ifdef CORNER_A
 
+    if (XbrCornerMode == 0)
+    {
 // Kept for reference
-//     edr = edr && (!edri.yzwx || !edri.wxyz);
-//     edr_left = lessThanEqual((XbrLv2Coefficient * df(f, g)), df(h, c)) &&
-//                interp_restriction_lv2_left && edr && (!edri.yzwx && eq(e, c));
-//     edr_up = greaterThanEqual(df(f, g), (XbrLv2Coefficient * df(h, c))) &&
-//              interp_restriction_lv2_up && edr && (!edri.wxyz && eq(e, g));
+//         edr = edr && (!edri.yzwx || !edri.wxyz);
+//         edr_left = lessThanEqual((XbrLv2Coefficient * df(f, g)), df(h, c)) &&
+//                    interp_restriction_lv2_left && edr && (!edri.yzwx && eq(e, c));
+//         edr_up = greaterThanEqual(df(f, g), (XbrLv2Coefficient * df(h, c))) &&
+//                  interp_restriction_lv2_up && edr && (!edri.wxyz && eq(e, g));
 
-    edr = comp_and(edr, comp_or(comp_neg(edri.yzwx), comp_neg(edri.wxyz)));
+        edr = comp_and(edr, comp_or(comp_neg(edri.yzwx), comp_neg(edri.wxyz)));
 
-    edr_left = lessThanEqual(XbrLv2Coefficient * df(f, g), df(h, c));
-    edr_left = comp_and(edr_left, interp_restriction_lv2_left);
-    edr_left = comp_and(edr_left, edr);
-    // [BUG] On Intel iGPU, inlining this variable into the next instruction breaks the upscaler
-    bvec4 erd_left_inter = comp_and(comp_neg(edri.yzwx), eq(e, c));
-    edr_left = comp_and(edr_left, erd_left_inter);
+        edr_left = lessThanEqual(XbrLv2Coefficient * df(f, g), df(h, c));
+        edr_left = comp_and(edr_left, interp_restriction_lv2_left);
+        edr_left = comp_and(edr_left, edr);
+        // [BUG] On Intel iGPU, inlining this variable into the next instruction breaks the upscaler
+        bvec4 erd_left_inter = comp_and(comp_neg(edri.yzwx), eq(e, c));
+        edr_left = comp_and(edr_left, erd_left_inter);
 
-    edr_up = greaterThanEqual(df(f, g), XbrLv2Coefficient * df(h, c));
-    edr_up = comp_and(edr_up, interp_restriction_lv2_up);
-    edr_up = comp_and(edr_up, edr);
-    // [BUG] On Intel iGPU, inlining this variable into the next instruction breaks the upscaler
-    bvec4 erd_up_inter = comp_and(comp_neg(edri.wxyz), eq(e, g));
-    edr_up = comp_and(edr_up, erd_up_inter);
-
-#endif
-#ifndef CORNER_A
+        edr_up = greaterThanEqual(df(f, g), XbrLv2Coefficient * df(h, c));
+        edr_up = comp_and(edr_up, interp_restriction_lv2_up);
+        edr_up = comp_and(edr_up, edr);
+        // [BUG] On Intel iGPU, inlining this variable into the next instruction breaks the upscaler
+        bvec4 erd_up_inter = comp_and(comp_neg(edri.wxyz), eq(e, g));
+        edr_up = comp_and(edr_up, erd_up_inter);
+    }
+    else
+    {
 // Kept for reference
-//    edr_left =
-//        ((XbrLv2Coefficient * df(f, g)) <= df(h, c)) && interp_restriction_lv2_left && edr;
-//    edr_up = (df(f, g) >= (XbrLv2Coefficient * df(h, c))) && interp_restriction_lv2_up && edr;
+//        edr_left =
+//            ((XbrLv2Coefficient * df(f, g)) <= df(h, c)) && interp_restriction_lv2_left && edr;
+//        edr_up = (df(f, g) >= (XbrLv2Coefficient * df(h, c))) && interp_restriction_lv2_up && edr;
 
-    edr_left = lessThanEqual(XbrLv2Coefficient * df(f, g), df(h, c));
-    edr_left = comp_and(edr_left, interp_restriction_lv2_left);
-    edr_left = comp_and(edr_left, edr);
+        edr_left = lessThanEqual(XbrLv2Coefficient * df(f, g), df(h, c));
+        edr_left = comp_and(edr_left, interp_restriction_lv2_left);
+        edr_left = comp_and(edr_left, edr);
 
-    edr_up = greaterThanEqual(df(f, g), XbrLv2Coefficient * df(h, c));
-    edr_up = comp_and(edr_up, interp_restriction_lv2_up);
-    edr_up = comp_and(edr_up, edr);
+        edr_up = greaterThanEqual(df(f, g), XbrLv2Coefficient * df(h, c));
+        edr_up = comp_and(edr_up, interp_restriction_lv2_up);
+        edr_up = comp_and(edr_up, edr);
 
-
-#endif
-
+    }
     vec4 fx45i = clamp((fx + delta - Co - Ci) / (2. * delta), 0., 1.);
     vec4 fx45 = clamp((fx + delta - Co) / (2. * delta), 0., 1.);
     vec4 fx30 = clamp((fx_left + deltaL - Cx) / (2. * deltaL), 0., 1.);

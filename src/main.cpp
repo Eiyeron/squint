@@ -102,6 +102,7 @@ int main(void)
     // xBR-lv2 (color blending version)
     Upscaler xbrLv2("shaders/xbr-lv2.frag");
     xbrLv2.addUniform(Uniform{Uniform::Type::Int, "Xbr Scale", "XbrScale", 4, 0.f, 5.f});
+    xbrLv2.addUniform(Uniform{Uniform::Type::Int, "Corner mode", "XbrCornerMode", 0, 0.f, 3.f});
     xbrLv2.addUniform(
         Uniform{Uniform::Type::Float, "Luma Weight", "XbrYWeight", 48.f, 0.f, 100.f});
     xbrLv2.addUniform(Uniform{Uniform::Type::Float,
