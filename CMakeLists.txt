@@ -27,13 +27,27 @@ endif()
 add_subdirectory(extern/raygui/projects/CMake)
 target_include_directories(raygui PUBLIC)
 
-# Use IXWebSocket
+# IXWebSocket
+SET(USE_ZLIB OFF CACHE BOOL "NO ZLIB")
 set(IXWEBSOCKET_INSTALL OFF CACHE BOOL "Install IXWebSocket")
 add_subdirectory(extern/IXWebSocket)
 target_include_directories(ixwebsocket PUBLIC)
 
-add_executable(${PROJECT_NAME} src/main.cpp src/raygui.cpp shaders/xbr-lv1.frag shaders/xbr-lv2.frag)
-target_link_libraries(${PROJECT_NAME} raylib ixwebsocket raygui)
+# -- Squint --
+
+add_executable(${PROJECT_NAME}
+  src/main.cpp
+  src/raygui.cpp
+  src/Upscaler.cpp
+  src/AsepriteConnection.cpp
+  # To keep track of them in IDEs.
+  shaders/xbr-lv1.frag
+  shaders/xbr-lv2.frag)
+
+target_link_libraries(${PROJECT_NAME}
+  raylib
+  ixwebsocket
+  raygui)
 
 # Checks if OSX and links appropriate frameworks (only required on MacOS)
 if (APPLE)

@@ -1,10 +1,5 @@
 #include "raygui.h"
 #include "raylib.h"
-#include <cinttypes>
-#include <cmath>
-#include <cstdint>
-#include <cstdio>
-#include <string>
 
 // [HACK] IXWebsocket includes some of Windows' headers, this manua define
 // circumvents a link conflict between Raylib's functions and Windows'.
@@ -14,8 +9,19 @@
 #define _APISETCONSOLEL3_
 #define _WINGDI_
 #endif
-#include "ixwebsocket/IXWebSocketMessageType.h"
 #include "ixwebsocket/IXWebSocketServer.h"
+#if defined(_WIN32) || defined(_WIN64)
+#undef _WINUSER_
+#undef _IMM_
+#undef _APISETCONSOLEL3_
+#undef _WINGDI_
+#endif
+
+#include "AsepriteConnection.h"
+#include "Upscaler.h"
+
+#include <cmath>
+#include <cstdint>
 
 enum class UiState
 {
@@ -24,251 +30,12 @@ enum class UiState
     Help,
 };
 
-bool connected = false;
-
-struct AsepriteImage
-{
-    uint32_t width = 0;
-    uint32_t height = 0;
-    std::vector<Color> pixels{};
-
-    AsepriteImage() = default;
-
-    AsepriteImage(AsepriteImage &&other) noexcept
-        : width(other.width)
-        , height(other.height)
-        , pixels(std::move(other.pixels))
-    {
-        other.height = 0;
-        other.width = 0;
-    }
-
-    AsepriteImage &operator=(AsepriteImage &&other) noexcept
-    {
-        width = other.width;
-        height = other.height;
-        pixels = std::move(other.pixels);
-        other.height = 0;
-        other.width = 0;
-        return *this;
-    }
-};
-
-static const char defaultVertexShader[] =
-    R"VERTEX(#version 330
-in vec3 vertexPosition;
-in vec2 vertexTexCoord;
-in vec4 vertexColor;
-out vec2 fragTexCoord;
-out vec4 fragColor;
-
-uniform mat4 mvp;
-void main()
-{
-    fragTexCoord = vertexTexCoord;
-    fragColor = vertexColor;
-    gl_Position = mvp*vec4(vertexPosition, 1.0);
-})VERTEX";
-
-struct Upscaler
-{
-    struct Uniform
-    {
-        enum class Type
-        {
-            Float,
-            Int,
-        };
-
-        Type type;
-        std::string name;
-        std::string uniformName;
-        float value;
-        float min;
-        float max;
-    };
-
-    Upscaler(const char *path)
-        : shaderPath(path)
-    {
-        reload();
-    }
-
-    ~Upscaler()
-    {
-        if (shader.id != 0)
-        {
-            UnloadShader(shader);
-            shader = {};
-        }
-    }
-
-    void unloadShader()
-    {
-        if (shader.id != 0)
-        {
-            UnloadShader(shader);
-            shader = {};
-        }
-    }
-
-    void reload()
-    {
-        char *shaderText = LoadFileText(shaderPath.c_str());
-        Shader newShader = LoadShaderFromMemory(defaultVertexShader, shaderText);
-        UnloadFileText(shaderText);
-        if (newShader.id != 0)
-        {
-            if (shader.id != 0)
-            {
-                UnloadShader(shader);
-            }
-            shader = newShader;
-        }
-    }
-
-    void addUniform(Uniform uniform)
-    {
-        uniforms.push_back(uniform);
-    }
-
-    int getTextWidth() const
-    {
-        int maxTextWidth = 0;
-        for (const Uniform &uniform : uniforms)
-        {
-            int textWidth = MeasureText(uniform.name.c_str(), 10);
-            if (textWidth > maxTextWidth)
-            {
-                maxTextWidth = textWidth;
-            }
-        }
-
-        return maxTextWidth;
-    }
-
-    bool drawSettings(float x, float y)
-    {
-        bool changed = false;
-
-        for (Uniform &uniform : uniforms)
-        {
-            float newValue = GuiSlider(Rectangle{x, y, 256.f, 20.f},
-                                       nullptr,
-                                       uniform.name.c_str(),
-                                       uniform.value,
-                                       uniform.min,
-                                       uniform.max);
-            if (uniform.type == Uniform::Type::Int)
-            {
-                newValue = roundf(newValue);
-            }
-
-            if (newValue != uniform.value)
-            {
-                if (uniform.type == Uniform::Type::Float)
-                {
-                    SetShaderValue(shader,
-                                   GetShaderLocation(shader, uniform.uniformName.c_str()),
-                                   &uniform.value,
-                                   SHADER_UNIFORM_FLOAT);
-                }
-                else
-                {
-                    int intValue = newValue;
-                    SetShaderValue(shader,
-                                   GetShaderLocation(shader, uniform.uniformName.c_str()),
-                                   &intValue,
-                                   SHADER_UNIFORM_INT);
-                }
-
-                uniform.value = newValue;
-                changed = true;
-            }
-
-            y += 32;
-        }
-
-        return changed;
-    }
-
-    void draw(Texture2D texture, RenderTexture2D output)
-    {
-
-        BeginTextureMode(output);
-        BeginShaderMode(shader);
-        ClearBackground(BLANK);
-        // RenderTextures in OpenGL must be flipped on the Y axis.
-        Rectangle src{0, 0, float(texture.width), -float(texture.height)};
-        Rectangle dest{0, 0, float(output.texture.width), float(output.texture.height)};
-        DrawTexturePro(texture, src, dest, {0, 0}, 0.f, WHITE);
-        EndShaderMode();
-        EndTextureMode();
-    }
-
-    std::vector<Uniform> uniforms;
-    std::string shaderPath;
-    Shader shader{};
-};
-
-struct ImageServer
-{
-    AsepriteImage lastReadyImage;
-
-    void onMessage(std::shared_ptr<ix::ConnectionState> connectionState,
-                   ix::WebSocket &webSocket,
-                   const ix::WebSocketMessagePtr &msg)
-    {
-        uint32_t w{}, h{};
-        switch (msg->type)
-        {
-        case ix::WebSocketMessageType::Close:
-            connected = false;
-            break;
-        case ix::WebSocketMessageType::Open:
-            connected = true;
-            break;
-        case ix::WebSocketMessageType::Message:
-            if (msg->binary)
-            {
-
-                unsigned long *hdr = (unsigned long *)msg->str.c_str();
-                unsigned char *data =
-                    (unsigned char *)(msg->str.c_str()) + 3 * sizeof(unsigned long);
-
-                if (hdr[0] == 'I')
-                {
-                    AsepriteImage newImage;
-                    newImage.width = hdr[1];
-                    newImage.height = hdr[2];
-                    uint64_t dataSize = uint64_t(newImage.width) * uint64_t(newImage.height);
-                    newImage.pixels.reserve(dataSize);
-                    for (uint32_t i = 0; i < dataSize; ++i)
-                    {
-                        Color nextByte;
-                        nextByte.r = data[0];
-                        nextByte.g = data[1];
-                        nextByte.b = data[2];
-                        nextByte.a = data[3];
-                        newImage.pixels.emplace_back(nextByte);
-                        data += 4;
-                    }
-                    lastReadyImage = std::move(newImage);
-                }
-            }
-            break;
-        default:
-            break;
-        }
-    }
-};
-
-void DrawTextBorder(const char *text,
-                    float x,
-                    float y,
-                    int size,
-                    Color textColor,
-                    Color outlineColor)
+static void DrawTextBorder(const char *text,
+                           float x,
+                           float y,
+                           int size,
+                           Color textColor,
+                           Color outlineColor)
 {
     for (int xb = -1; xb <= 1; ++xb)
     {
@@ -287,6 +54,7 @@ void DrawTextBorder(const char *text,
 
 int main(void)
 {
+    using Uniform = Upscaler::Uniform;
 
     // Initialization
     //--------------------------------------------------------------------------------------
@@ -295,8 +63,9 @@ int main(void)
 
     UiState uiState = UiState::Nothing;
 
-    ImageServer imageServer;
-    // init
+    AsepriteConnection imageServer;
+
+    // Prepare the WebSocket server.
     ix::initNetSystem();
     ix::WebSocketServer serv(34613);
     serv.disablePerMessageDeflate();
@@ -306,9 +75,9 @@ int main(void)
                        const ix::WebSocketMessagePtr &msg) {
             imageServer.onMessage(connectionState, webSocket, msg);
         });
-
     serv.listenAndStart();
 
+    // Prepare Raylib, the window, the graphics settings...
     InitWindow(screenWidth, screenHeight, "Squint live viewer");
     SetExitKey(KEY_NULL);
     SetWindowState(FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT);
@@ -319,42 +88,30 @@ int main(void)
     Texture2D currentTexture{};
     RenderTexture2D upscaledTexture{};
 
-    // [TODO] Move the binary genreation out of build/ and the shaders into their own folders
-    // for an easier release process.
+    // Prepare the shaders.
+    // xBR-lv1 (no blend version)
     Upscaler xbrLv1("shaders/xbr-lv1.frag");
-    xbrLv1.addUniform(Upscaler::Uniform{Upscaler::Uniform::Type::Float,
-                                        "Luma Weight",
-                                        "XbrYWeight",
-                                        48.f,
-                                        0.f,
-                                        100.f});
-    xbrLv1.addUniform(Upscaler::Uniform{Upscaler::Uniform::Type::Float,
-                                        "Color match threshold",
-                                        "XbrEqThreshold",
-                                        30.f,
-                                        0.f,
-                                        50.f});
+    xbrLv1.addUniform(
+        Uniform{Uniform::Type::Float, "Luma Weight", "XbrYWeight", 48.f, 0.f, 100.f});
+    xbrLv1.addUniform(Uniform{Uniform::Type::Float,
+                              "Color match threshold",
+                              "XbrEqThreshold",
+                              30.f,
+                              0.f,
+                              50.f});
+    // xBR-lv2 (color blending version)
     Upscaler xbrLv2("shaders/xbr-lv2.frag");
+    xbrLv2.addUniform(Uniform{Uniform::Type::Int, "Xbr Scale", "XbrScale", 4, 0.f, 5.f});
     xbrLv2.addUniform(
-        Upscaler::Uniform{Upscaler::Uniform::Type::Int, "Xbr Scale", "XbrScale", 4, 0.f, 5.f});
-    xbrLv2.addUniform(Upscaler::Uniform{Upscaler::Uniform::Type::Float,
-                                        "Luma Weight",
-                                        "XbrYWeight",
-                                        48.f,
-                                        0.f,
-                                        100.f});
-    xbrLv2.addUniform(Upscaler::Uniform{Upscaler::Uniform::Type::Float,
-                                        "Color match threshold",
-                                        "XbrEqThreshold",
-                                        30.f,
-                                        0.f,
-                                        50.f});
-    xbrLv2.addUniform(Upscaler::Uniform{Upscaler::Uniform::Type::Float,
-                                        "Lv 2 coefficient",
-                                        "XbrLv2Coefficient",
-                                        2.f,
-                                        0.f,
-                                        3.f});
+        Uniform{Uniform::Type::Float, "Luma Weight", "XbrYWeight", 48.f, 0.f, 100.f});
+    xbrLv2.addUniform(Uniform{Uniform::Type::Float,
+                              "Color match threshold",
+                              "XbrEqThreshold",
+                              30.f,
+                              0.f,
+                              50.f});
+    xbrLv2.addUniform(
+        Uniform{Uniform::Type::Float, "Lv 2 coefficient", "XbrLv2Coefficient", 2.f, 0.f, 3.f});
 
     int selectedUpscaler = 0;
     bool upscalerComboBoxActive = false;
@@ -402,7 +159,7 @@ int main(void)
                 screenHeight = GetScreenHeight();
             }
 
-            if (!connected)
+            if (!imageServer.connected)
             {
                 ClearBackground(GRAY);
                 Vector2 size =
@@ -500,12 +257,12 @@ int main(void)
                     else if (selectedUpscaler == 1)
                     {
                         maxTextWidth = xbrLv1.getTextWidth() + 32.f;
-                        numFields = xbrLv1.uniforms.size();
+                        numFields = xbrLv1.getNumUniforms();
                     }
                     else if (selectedUpscaler == 2)
                     {
                         maxTextWidth = xbrLv2.getTextWidth() + 32.f;
-                        numFields = xbrLv2.uniforms.size();
+                        numFields = xbrLv2.getNumUniforms();
                     }
                 }
 
