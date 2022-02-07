@@ -9,8 +9,8 @@
 ]]
 
 local ws -- websocket created later
-local dlg = Dialog()
-local spr = app.activeSprite
+local dlg
+local spr
 
 --[[
 Set up an image buffer for two reasons:
@@ -18,7 +18,7 @@ Set up an image buffer for two reasons:
     b) the sprite might not be in RGBA mode, and it's easier to use ase 
        than do conversions on the other side.
 ]]
-local buf = Image(spr.width, spr.height, ColorMode.RGB)
+local buf
 
 -- magic number, not strictly required in this example
 local IMAGE_ID = string.byte("I")
@@ -91,14 +91,25 @@ local function receive(t, message)
     end
 end
 
+function init(plugin)
+    plugin:newCommand {
+        id="SquintStartClient",
+        title="Connect to Squint",
+        group="file_open",
+        onclick=function()
+            dlg = Dialog()
+            spr = app.activeSprite
+            buf = Image(spr.width, spr.height, ColorMode.RGB)
+            -- set up a websocket
+            ws = WebSocket{ url="http://127.0.0.1:34613", onreceive=receive, deflate=false }
 
--- set up a websocket
-ws = WebSocket{ url="http://127.0.0.1:34613", onreceive=receive, deflate=false }
+            -- create an UI
+            dlg:label{ id="status", text="Connecting..." }
+            dlg:button{ text="Cancel", onclick=finish}
 
--- create an UI
-dlg:label{ id="status", text="Connecting..." }
-dlg:button{ text="Cancel", onclick=finish}
-
--- let's go!
-ws:connect()
-dlg:show{ wait=false }
+            -- let's go!
+            ws:connect()
+            dlg:show{ wait=false }
+        end
+    }
+end

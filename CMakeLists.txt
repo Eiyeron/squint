@@ -33,6 +33,18 @@ set(IXWEBSOCKET_INSTALL OFF CACHE BOOL "Install IXWebSocket")
 add_subdirectory(extern/IXWebSocket)
 target_include_directories(ixwebsocket PUBLIC)
 
+
+# -- Squint Aseprite extension --
+
+set(EXTENSION_FILES "${CMAKE_CURRENT_SOURCE_DIR}/client/main.lua" "${CMAKE_CURRENT_SOURCE_DIR}/client/package.json")
+message("[${EXTENSION_FILES}]")
+add_custom_command(
+  COMMAND ${CMAKE_COMMAND} -E tar "cf" "${CMAKE_CURRENT_BINARY_DIR}/squint-client.aseprite-extension" --format=zip -- ${EXTENSION_FILES}
+  OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/squint-client.aseprite-extension"
+  DEPENDS "${EXTENSION_FILES}"
+  COMMENT "Creating Aseprite extension"
+)
+
 # -- Squint --
 
 add_executable(${PROJECT_NAME}
@@ -43,6 +55,8 @@ add_executable(${PROJECT_NAME}
   # To keep track of them in IDEs.
   shaders/xbr-lv1.frag
   shaders/xbr-lv2.frag)
+
+add_custom_target(asperite_extension ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/squint-client.aseprite-extension)
 
 target_link_libraries(${PROJECT_NAME}
   raylib

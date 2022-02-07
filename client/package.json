@@ -1,0 +1,24 @@
+{
+    "name": "squint-client",
+    "displayName": "Squint client",
+    "description": "Client code to connect to squint",
+    "version": "0.1",
+    "author": {
+        "name": "Florian Dormont",
+        "email": "eiyeron@retroactive.me",
+        "url": "https://eiyeron.itch.io/squint"
+    },
+    "contributors": [],
+    "publisher": "Eiyeron",
+    "licence": "MIT",
+    "categories": [
+        "Scripts"
+    ],
+    "contributes": {
+        "scripts": [
+            {
+                "path": "main.lua"
+            }
+        ]
+    }
+}
