@@ -95,7 +95,7 @@ function init(plugin)
     plugin:newCommand {
         id="SquintStartClient",
         title="Connect to Squint",
-        group="file_open",
+        group="file_scripts",
         onclick=function()
             dlg = Dialog()
             spr = app.activeSprite
