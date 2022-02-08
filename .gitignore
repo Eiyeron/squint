@@ -1,3 +1,10 @@
+# Compilation files
 build/
+
+# Release files.
+package/
+squint.zip
+
+# Misc.
 .cache
 .vscode
