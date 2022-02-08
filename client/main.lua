@@ -1,6 +1,8 @@
 --[[
-    Sync data via websocket - client side
-    - By Lampysprites
+    Squint client script
+        by Florian Dormont.
+
+    Based on a sample project by Lampysprites.
 
     This script will keep running for a while if the dialog window 
     is closed with an "x" button :(
@@ -8,9 +10,9 @@
     If that happens, close the sprite and open again (Shift + Ctrl + T)
 ]]
 
-local ws -- websocket created later
-local dlg
-local spr
+local web_socket
+local dialog
+local current_sprite
 
 --[[
 Set up an image buffer for two reasons:
@@ -18,77 +20,90 @@ Set up an image buffer for two reasons:
     b) the sprite might not be in RGBA mode, and it's easier to use ase 
        than do conversions on the other side.
 ]]
-local buf
+local image_buffer
 
--- magic number, not strictly required in this example
+-- Send image command identifier
 local IMAGE_ID = string.byte("I")
 
 
--- callbacks, defined as variable because onSiteChange() calls
--- finish(), and finish() uses onSiteChange
-local sendImage
-local onSiteChange
+-- Forward declarations
+local send_image_to_squint
+local on_site_change
 
 
--- clean up and exit
+-- Clean up and exit
 local function finish()
-    if ws ~= nil then ws:close() end
-    if dlg ~= nil then dlg:close() end
-    spr.events:off(sendImage)
-    app.events:off(onSiteChange)
-    spr = nil
-    dlg = nil
+    if web_socket ~= nil then web_socket:close() end
+    if dialog ~= nil then dialog:close() end
+    if current_sprite ~= nil then current_sprite.events:off(send_image_to_squint) end
+    app.events:off(on_site_change)
+    current_sprite = nil
+    dialog = nil
 end
 
+local function set_sprite_hooks(sprite)
+    sprite.events:on('change', send_image_to_squint)
+end
 
-sendImage = function()
-    if buf.width ~= spr.width or buf.height ~= spr.height then
-        buf:resize(spr.width, spr.height)
+local function unset_sprite_hooks(sprite)
+    sprite.events:off(send_image_to_squint)
+end
+
+local function setup_image_buffer()
+    if image_buffer == nil then
+        image_buffer = Image(current_sprite.width, current_sprite.height, ColorMode.RGB)
+    elseif image_buffer.width ~= current_sprite.width or image_buffer.height ~= current_sprite.height then
+        image_buffer:resize(current_sprite.width, current_sprite.height)
     end
+end
 
-    buf:clear()
-    buf:drawSprite(spr, app.activeFrame.frameNumber)
+send_image_to_squint = function()
+    setup_image_buffer()
+    image_buffer:clear()
+    image_buffer:drawSprite(current_sprite, app.activeFrame.frameNumber)
 
-    ws:sendBinary(string.pack("<LLL", IMAGE_ID, buf.width, buf.height), buf.bytes)
+    web_socket:sendBinary(string.pack("<LLL", IMAGE_ID, image_buffer.width, image_buffer.height), image_buffer.bytes)
 end
 
 
 -- close connection and ui if the sprite is closed
 local frame = -1
-onSiteChange = function()
-    if app.activeSprite ~= spr then
-        -- quit if the sprite was closed
-        for _,s in ipairs(app.sprites) do
-            if s == spr then 
-                -- the sprite is open in an inactive tab
-                break
-            end
+on_site_change = function()
+    if app.activeSprite ~= current_sprite then
+        if current_sprite ~= nil then
+           unset_sprite_hooks(current_sprite)
         end
 
-        finish()
-    else
+        if app.activeSprite ~= nil then 
+            current_sprite = app.activeSprite
+            set_sprite_hooks(current_sprite)
+            send_image_to_squint()
+        end
+
+        set_sprite_hooks(current_sprite)
+    elseif current_sprite ~= nil then
         -- update the view after the frame changes
         if app.activeFrame.frameNumber ~= frame then
             frame = app.activeFrame.frameNumber
-            sendImage()
+            send_image_to_squint()
         end
     end
 end
 
 
--- t is for type, there's already a lua function
-local function receive(t, message)
-    if t == WebSocketMessageType.OPEN then
-        dlg:modify{id="status", text="Sync ON"}
-        spr.events:on('change', sendImage)
-        app.events:on('sitechange', onSiteChange)
-        sendImage()
-
-    elseif t == WebSocketMessageType.CLOSE and dlg ~= nil then
-        dlg:modify{id="status", text="No connection"}
-        spr.events:off(sendImage)
-        app.events:off(onSiteChange)
+local function on_squint_connection(message_type, message)
+    if message_type == WebSocketMessageType.OPEN then
+        dialog:modify{id="status", text="Connected"}
+        app.events:on('sitechange', on_site_change)
+        on_site_change()
+    elseif message_type == WebSocketMessageType.CLOSE and dialog ~= nil then
+        dialog:modify{id="status", text="No connection"}
+        app.events:off(on_site_change)
     end
+end
+
+function exit(plugin)
+    finish()
 end
 
 function init(plugin)
@@ -97,19 +112,22 @@ function init(plugin)
         title="Connect to Squint",
         group="file_scripts",
         onclick=function()
-            dlg = Dialog()
-            spr = app.activeSprite
-            buf = Image(spr.width, spr.height, ColorMode.RGB)
-            -- set up a websocket
-            ws = WebSocket{ url="http://127.0.0.1:34613", onreceive=receive, deflate=false }
+            dialog = Dialog()
+            current_sprite = app.activeSprite
+            if current_sprite ~= nil then
+                image_buffer = Image(current_sprite.width, current_sprite.height, ColorMode.RGB)
+            end
+            -- Set up a websocket
+            -- TODO once I get an easy way to build squing with zlib, switch deflate to true
+            web_socket = WebSocket{ url="http://127.0.0.1:34613", onreceive=on_squint_connection, deflate=false }
 
-            -- create an UI
-            dlg:label{ id="status", text="Connecting..." }
-            dlg:button{ text="Cancel", onclick=finish}
+            -- Create the connection status popup
+            dialog:label{ id="status", text="Connecting..." }
+            dialog:button{ text="Close", onclick=finish}
 
-            -- let's go!
-            ws:connect()
-            dlg:show{ wait=false }
+            -- GO
+            web_socket:connect()
+            dialog:show{ wait=false }
         end
     }
 end

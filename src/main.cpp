@@ -123,6 +123,8 @@ int main(void)
     bool darkBackground = false;
     bool willScreenshot = false;
 
+    bool previouslyConnected = false;
+
     //--------------------------------------------------------------------------------------
 
     // Main game loop
@@ -199,6 +201,25 @@ int main(void)
                         UpdateTexture(currentTexture, currentImage.data);
                     }
                 }
+                else if (imageServer.connected && !previouslyConnected)
+                {
+                    // Clear the texture in case of reconnection.
+                    refreshUpscalee = true;
+                    UnloadTexture(currentTexture);
+                    Image blankPixel;
+                    blankPixel.width = 1;
+                    blankPixel.height = 1;
+                    const char singlePixel[4] = {
+                        0x0,
+                        0x0,
+                        0x0,
+                        0x0,
+                    };
+                    blankPixel.data = (void*)singlePixel;
+                    blankPixel.format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8;
+                    blankPixel.mipmaps = 1;
+                    currentTexture = LoadTextureFromImage(blankPixel);
+                }
 
                 if (refreshRenderTarget)
                 {
@@ -246,6 +267,8 @@ int main(void)
 
                 DrawTextureEx(upscaledTexture.texture, texturePosition, 0, 1, WHITE);
             }
+
+            previouslyConnected = imageServer.connected;
 
             if (uiState == UiState::Main)
             {
@@ -307,7 +330,6 @@ int main(void)
                     case 2:
                         refreshUpscalee |= xbrLv2.drawSettings(32, 72);
                         break;
-                    default:;
                     }
                 }
 
