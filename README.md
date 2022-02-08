@@ -11,11 +11,12 @@ Squint is a live upscaler companion program for [Aseprite][aseprite] that allows
 ## Usage
 
 ### Aseprite setup
-- Copy the `client.lua` script into your Aseprite `scripts` folder. You can locate it by clicking on "Locate Configuration File" at the bottom of the General section of Aseprite's preferences.
-- Launch the script through ("File / scripts"). If you don't see it, you probably haven't reloaded Aseprite or rescanned the script folder yet right after dropping the file.
-- A small window should appear. It's non-blocking, you can still edit your sprite while it's on.
+- Install the extension named `squint-client.aseprite-extension`. Either double-click the file or install it through Aseprite by locating the "Extensions" tab in the Preferences menu, pressing the "Add Extension" button and locating the extension.
+- In the File menu, a new "Connect to Squint" entry should have appeared. If you don't see it, you probably haven't reloaded Aseprite or you may have accidentally disabled the extension.
+- When clicking on the new menu entry, a small window should appear. It's non-blocking so you can still edit the current sprite while it's on.
 - Aseprite is now waiting for squint to wait for a connection.
 - You can now launch squint and see it showing your sprite once the communication is done.
+- As a quirk from the first version of the script, the script will shut down if you switch to another sprite. This is [well known][issue_7] and is planned to be fixed.
 
 ### Controls
 - F1 to toggle the help screen.
@@ -54,3 +55,4 @@ It has a few dependencies: [raylib], [raygui] and [IXWebSocket][ixwebsocket].
 [raylib]: https://raylib.com
 [raygui]: https://github.com/raysan5/raygui
 [ixwebsocket]: https://github.com/machinezone/IXWebSocket
+[issue_7]: https://github.com/Eiyeron/squint/issues/7

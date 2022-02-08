@@ -14,13 +14,20 @@ Have a nice day!
 
 ## [0.1.1] 2021-02-06
 
-## Added
+### Added
 - xBR shaders have now a corner mode selection setting that alters the way they match and interpolate the pixels.
 
-## Fixed
+### Fixed
 - xBR-lv2 now compile and works on Intel HD iGPU (https://github.com/Eiyeron/squint/issues/1)
 - The masking color, a magenta with out-of-bounds values, has been tweaked to avoid leaking into the sprite.
 - The "Save picture" shortcut wasn't working unless the GUI was shown. This was fixed.
+
+## Unreleased
+
+### Changed
+- The Aseprite script was turned into a fully-fledged extension.
+- The old script must be removed from Aseprite and the extension will the only supported way to install future versions of the script.
+
 
 [0.1.0]: https://github.com/Eiyeron/squint/releases/tag/v0.1.0
 [0.1.1]: https://github.com/Eiyeron/squint/releases/tag/v0.1.1
