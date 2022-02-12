@@ -68,7 +68,7 @@ end
 
 -- close connection and ui if the sprite is closed
 local frame = -1
-on_site_change = function()
+on_site_change = function(send_trigger)
     if app.activeSprite ~= current_sprite then
         if current_sprite ~= nil then
            unset_sprite_hooks(current_sprite)
@@ -77,7 +77,7 @@ on_site_change = function()
         if app.activeSprite ~= nil then 
             current_sprite = app.activeSprite
             set_sprite_hooks(current_sprite)
-            send_image_to_squint()
+            send_trigger = true
         end
 
         set_sprite_hooks(current_sprite)
@@ -85,8 +85,12 @@ on_site_change = function()
         -- update the view after the frame changes
         if app.activeFrame.frameNumber ~= frame then
             frame = app.activeFrame.frameNumber
-            send_image_to_squint()
+            send_trigger = true
         end
+    end
+    
+    if send_trigger then
+        send_image_to_squint()
     end
 end
 
@@ -95,7 +99,7 @@ local function on_squint_connection(message_type, message)
     if message_type == WebSocketMessageType.OPEN then
         dialog:modify{id="status", text="Connected"}
         app.events:on('sitechange', on_site_change)
-        on_site_change()
+        on_site_change(true)
     elseif message_type == WebSocketMessageType.CLOSE and dialog ~= nil then
         dialog:modify{id="status", text="No connection"}
         app.events:off(on_site_change)
