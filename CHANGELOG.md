@@ -22,12 +22,24 @@ Have a nice day!
 - The masking color, a magenta with out-of-bounds values, has been tweaked to avoid leaking into the sprite.
 - The "Save picture" shortcut wasn't working unless the GUI was shown. This was fixed.
 
-## Unreleased
+## [0.2.0] 2021-02-12
+
+### Added
+- The Aseprite client script supports active sprite changes (https://github.com/Eiyeron/squint/issues/7)
+- The CMake project file now has target to simplify packaging and releasing.
+
+### Fixed
+- The Aseprite client script now re-sends data when it detects a reconnection in siutation it didn't previously.
+- Some crashes caused by data races has been fixed.
 
 ### Changed
-- The Aseprite script was turned into a fully-fledged extension.
-- The old script must be removed from Aseprite and the extension will the only supported way to install future versions of the script.
+- The Aseprite script was turned into a fully-fledged extension (https://github.com/Eiyeron/squint/issues/5).
+    - The old script must be removed from Aseprite and the extension will the only supported way to install future versions of the script.
+    - A new menu entry, "Connect to Squing" located in the File menu, will launch the connection. It's designed to replace the manual script execution.
+- The console is hidden on Windows (https://github.com/Eiyeron/squint/issues/8)
+- Logging is written to `squint.log`.
 
 
 [0.1.0]: https://github.com/Eiyeron/squint/releases/tag/v0.1.0
 [0.1.1]: https://github.com/Eiyeron/squint/releases/tag/v0.1.1
+[0.2.0]: https://github.com/Eiyeron/squint/releases/tag/v0.2.0
