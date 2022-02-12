@@ -52,7 +52,11 @@ add_executable(${PROJECT_NAME}
   src/main.cpp
   src/raygui.cpp
   src/Upscaler.cpp
+  src/Upscaler.h
   src/AsepriteConnection.cpp
+  src/AsepriteConnection.h
+  src/platformSetup.cpp
+  src/platformSetup.h
   # To keep track of them in IDEs.
   shaders/xbr-lv1.frag
   shaders/xbr-lv2.frag)

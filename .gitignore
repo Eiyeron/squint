@@ -5,6 +5,9 @@ build/
 package/
 squint.zip
 
+# Debug log
+*.log
+
 # Misc.
 .cache
 .vscode

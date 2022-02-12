@@ -20,6 +20,8 @@
 #include "AsepriteConnection.h"
 #include "Upscaler.h"
 
+#include "platformSetup.h"
+
 #include <cmath>
 #include <cstdint>
 
@@ -52,7 +54,8 @@ static void DrawTextBorder(const char *text,
     DrawText(text, x, y, size, textColor);
 }
 
-int main(void)
+
+int start()
 {
     using Uniform = Upscaler::Uniform;
 
@@ -215,7 +218,7 @@ int main(void)
                         0x0,
                         0x0,
                     };
-                    blankPixel.data = (void*)singlePixel;
+                    blankPixel.data = (void *)singlePixel;
                     blankPixel.format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8;
                     blankPixel.mipmaps = 1;
                     currentTexture = LoadTextureFromImage(blankPixel);
@@ -404,4 +407,11 @@ int main(void)
     //--------------------------------------------------------------------------------------
 
     return 0;
+}
+
+int main(void)
+{
+    setupLoggingOutput();
+    int result = start();
+    unsetupLoggingOutput();
 }
