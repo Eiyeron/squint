@@ -179,7 +179,12 @@ int start()
             else
             {
                 ClearBackground(darkBackground ? DARKGRAY : WHITE);
-                AsepriteImage lastImage = std::move(imageServer.lastReadyImage);
+                AsepriteImage lastImage; 
+                if (imageServer.lastReadyImageMutex.try_lock())
+                {
+                    lastImage = std::move(imageServer.lastReadyImage);
+                    imageServer.lastReadyImageMutex.unlock();
+                }
                 Image currentImage;
                 currentImage.width = lastImage.width;
                 currentImage.height = lastImage.height;

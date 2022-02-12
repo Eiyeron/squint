@@ -57,7 +57,11 @@ void AsepriteConnection::onMessage(std::shared_ptr<ix::ConnectionState> connecti
                     newImage.pixels.emplace_back(nextByte);
                     data += 4;
                 }
-                lastReadyImage = std::move(newImage);
+
+                {
+                    std::scoped_lock imageLock(lastReadyImageMutex);
+                    lastReadyImage = std::move(newImage);                
+                }
             }
         }
         break;

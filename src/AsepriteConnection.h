@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <memory>
 #include <vector>
+#include <mutex>
 
 struct AsepriteImage
 {
@@ -25,6 +26,7 @@ struct AsepriteImage
 
 struct AsepriteConnection
 {
+    mutable std::mutex lastReadyImageMutex;
     AsepriteImage lastReadyImage;
     bool connected = false;
 
