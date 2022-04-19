@@ -15,10 +15,8 @@ local dialog
 local current_sprite
 
 --[[
-Set up an image buffer for two reasons:
-    a) the active cel might not be the same size as the sprite
-    b) the sprite might not be in RGBA mode, and it's easier to use ase 
-       than do conversions on the other side.
+    Set up an image buffer for two reasons to leverage Aseprite's own layer blending
+    and to make sure that the whole sprite is sent to squint.
 ]]
 local image_buffer
 
@@ -50,6 +48,10 @@ local function unset_sprite_hooks(sprite)
 end
 
 local function setup_image_buffer()
+    if current_sprite == nil then
+        return
+    end
+
     if image_buffer == nil then
         image_buffer = Image(current_sprite.width, current_sprite.height, ColorMode.RGB)
     elseif image_buffer.width ~= current_sprite.width or image_buffer.height ~= current_sprite.height then
@@ -59,10 +61,13 @@ end
 
 send_image_to_squint = function()
     setup_image_buffer()
-    image_buffer:clear()
-    image_buffer:drawSprite(current_sprite, app.activeFrame.frameNumber)
 
-    web_socket:sendBinary(string.pack("<LLL", IMAGE_ID, image_buffer.width, image_buffer.height), image_buffer.bytes)
+    if image_buffer ~= nil then
+        image_buffer:clear()
+        image_buffer:drawSprite(current_sprite, app.activeFrame.frameNumber)
+
+        web_socket:sendBinary(string.pack("<LLL", IMAGE_ID, image_buffer.width, image_buffer.height), image_buffer.bytes)
+    end
 end
 
 
@@ -116,18 +121,16 @@ function init(plugin)
         title="Connect to Squint",
         group="file_scripts",
         onclick=function()
-            dialog = Dialog()
-            current_sprite = app.activeSprite
-            if current_sprite ~= nil then
-                image_buffer = Image(current_sprite.width, current_sprite.height, ColorMode.RGB)
-            end
+            dialog = Dialog {
+                title="Squint client"
+            }
             -- Set up a websocket
-            -- TODO once I get an easy way to build squing with zlib, switch deflate to true
+            -- TODO once I get an easy way to build squint with zlib, switch deflate to true
             web_socket = WebSocket{ url="http://127.0.0.1:34613", onreceive=on_squint_connection, deflate=false }
 
             -- Create the connection status popup
             dialog:label{ id="status", text="Connecting..." }
-            dialog:button{ text="Close", onclick=finish}
+            dialog:button{ text="Close the connection", onclick=finish}
 
             -- GO
             web_socket:connect()
