@@ -3,7 +3,7 @@ build/
 
 # Release files.
 package/
-squint.zip
+squint*.zip
 
 # Debug log
 *.log

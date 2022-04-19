@@ -39,7 +39,14 @@ Have a nice day!
 - The console is hidden on Windows (https://github.com/Eiyeron/squint/issues/8)
 - Logging is written to `squint.log`.
 
+## [0.2.1] 2021-04-19
+
+### Fixed
+- The hooks to listen to sprite changes weren't properly set in the client script.
+- Added an additional check to avoid an error when launching the client script when the current tab wasn't a sprite.
+
 
 [0.1.0]: https://github.com/Eiyeron/squint/releases/tag/v0.1.0
 [0.1.1]: https://github.com/Eiyeron/squint/releases/tag/v0.1.1
 [0.2.0]: https://github.com/Eiyeron/squint/releases/tag/v0.2.0
+[0.2.1]: https://github.com/Eiyeron/squint/releases/tag/v0.2.1
