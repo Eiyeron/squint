@@ -61,8 +61,8 @@ int start()
 
     // Initialization
     //--------------------------------------------------------------------------------------
-    int screenWidth = 800;
-    int screenHeight = 450;
+    int windowWidth = 800;
+    int windowHeight = 450;
 
     UiState uiState = UiState::Nothing;
 
@@ -81,7 +81,7 @@ int start()
     serv.listenAndStart();
 
     // Prepare Raylib, the window, the graphics settings...
-    InitWindow(screenWidth, screenHeight, "Squint live viewer");
+    InitWindow(windowWidth, windowHeight, "Squint live viewer");
     SetExitKey(KEY_NULL);
     SetWindowState(FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT);
     SetWindowMinSize(256, 256);
@@ -128,6 +128,12 @@ int start()
 
     bool previouslyConnected = false;
 
+    bool fullscreenMode = false;
+
+    int storedWindowWidth = 800;
+    int storedWindowHeight = 450;
+    Vector2 storedWindowPostion;
+
     //--------------------------------------------------------------------------------------
 
     // Main game loop
@@ -155,6 +161,32 @@ int start()
             willScreenshot = true;
         }
 
+        if (IsKeyPressed(KEY_F11))
+        {
+            fullscreenMode = !fullscreenMode;
+            if (fullscreenMode)
+            {
+                storedWindowWidth = windowWidth;
+                storedWindowHeight = windowHeight;
+                storedWindowPostion = GetWindowPosition();
+                int currentMonitorIndex = GetCurrentMonitor();
+                Vector2 monitorPosition = GetMonitorPosition(currentMonitorIndex);
+                int monitorWidth = GetMonitorWidth(currentMonitorIndex);
+                int monitorHeight = GetMonitorHeight(currentMonitorIndex);
+                SetWindowState(FLAG_WINDOW_TOPMOST);
+                ClearWindowState(FLAG_WINDOW_RESIZABLE);
+                SetWindowSize(monitorWidth, monitorHeight);
+                SetWindowPosition(monitorPosition.x, monitorPosition.y);
+            }
+            else
+            {
+                SetWindowState(FLAG_WINDOW_RESIZABLE);
+                ClearWindowState(FLAG_WINDOW_TOPMOST);
+                SetWindowSize(storedWindowWidth, storedWindowHeight);
+                SetWindowPosition(storedWindowPostion.x, storedWindowPostion.y);
+            }
+        }
+
         // Draw
         //----------------------------------------------------------------------------------
         {
@@ -162,8 +194,8 @@ int start()
 
             if (IsWindowResized())
             {
-                screenWidth = GetScreenWidth();
-                screenHeight = GetScreenHeight();
+                windowWidth = GetScreenWidth();
+                windowHeight = GetScreenHeight();
             }
 
             if (!imageServer.connected)
@@ -172,8 +204,8 @@ int start()
                 Vector2 size =
                     MeasureTextEx(GetFontDefault(), "Waiting for connection.", 20, 0);
                 Vector2 pos;
-                pos.x = (screenWidth - size.x) / 2;
-                pos.y = (screenHeight - size.y) / 2;
+                pos.x = (windowWidth - size.x) / 2;
+                pos.y = (windowHeight - size.y) / 2;
                 DrawText("Waiting for connection.", int(pos.x), int(pos.y), 20, LIGHTGRAY);
             }
             else
@@ -270,8 +302,8 @@ int start()
                     }
                 }
 
-                Vector2 texturePosition{(screenWidth - upscaledTexture.texture.width) / 2.f,
-                                        (screenHeight - upscaledTexture.texture.height) / 2.f};
+                Vector2 texturePosition{(windowWidth - upscaledTexture.texture.width) / 2.f,
+                                        (windowHeight - upscaledTexture.texture.height) / 2.f};
 
                 DrawTextureEx(upscaledTexture.texture, texturePosition, 0, 1, WHITE);
             }
@@ -346,31 +378,32 @@ int start()
                     refreshUpscalee = true;
                 }
 
-                if (GuiButton({float(screenWidth) - 128 - 16, 8, 64, 20}, "Save!"))
+                if (GuiButton({float(windowWidth) - 128 - 16, 8, 64, 20}, "Save!"))
                 {
                     willScreenshot = true;
                 }
 
-                if (GuiButton({float(screenWidth) - 128 - 16, 40, 137, 20},
+                if (GuiButton({float(windowWidth) - 128 - 16, 40, 137, 20},
                               "Toggle background"))
                 {
                     darkBackground = !darkBackground;
                 }
 
-                if (GuiButton({float(screenWidth) - 64 - 8, 8, 64, 20}, "Help!"))
+                if (GuiButton({float(windowWidth) - 64 - 8, 8, 64, 20}, "Help!"))
                 {
                     uiState = UiState::Help;
                 }
             }
             else if (uiState == UiState::Help)
             {
-                DrawRectangle(0, 0, screenWidth, screenHeight, Color{0, 0, 0, 128});
+                DrawRectangle(0, 0, windowWidth, windowHeight, Color{0, 0, 0, 128});
                 DrawTextBorder("Controls", 16, 18, 30, WHITE, BLACK);
                 DrawTextBorder(
                     R"END(- F1 to toggle this help
 - F2 to toggle the background's color.
 - Right-click or TAB to toggle the options.
 - S to save the current result.
+- F11 to toggle fullscreen mode.
 - F12 to screenshot.)END",
                     24,
                     60,
@@ -378,7 +411,7 @@ int start()
                     WHITE,
                     BLACK);
 
-                if (GuiButton({float(screenWidth) - 64 - 8, 8, 64, 20}, "Back"))
+                if (GuiButton({float(windowWidth) - 64 - 8, 8, 64, 20}, "Back"))
                 {
                     uiState = UiState::Main;
                 }

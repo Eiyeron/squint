@@ -23,6 +23,7 @@ Squint is a live upscaler companion program for [Aseprite][aseprite] that allows
 - F2 to toggle the background's color between white and dark gray.
 - Right-click or TAB to toggle the options screen.
 - S to save the current result into `saved.png`.
+- F11 to toggle fullscreen mode.
 - F12 to screenshot.
 
 ## Compilation
