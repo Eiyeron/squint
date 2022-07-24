@@ -1,5 +1,6 @@
 #include "raygui.h"
 #include "raylib.h"
+#include "raymath.h"
 
 // [HACK] IXWebsocket includes some of Windows' headers, this manua define
 // circumvents a link conflict between Raylib's functions and Windows'.
@@ -18,7 +19,6 @@
 #endif
 
 #include "AsepriteConnection.h"
-#include "Upscaler.h"
 
 #include "platformSetup.h"
 
@@ -57,12 +57,10 @@ static void DrawTextBorder(const char *text,
 
 int start()
 {
-    using Uniform = Upscaler::Uniform;
-
     // Initialization
     //--------------------------------------------------------------------------------------
-    int screenWidth = 800;
-    int screenHeight = 450;
+    
+    bool useFullScreen = false;
 
     UiState uiState = UiState::Nothing;
 
@@ -81,104 +79,79 @@ int start()
     serv.listenAndStart();
 
     // Prepare Raylib, the window, the graphics settings...
-    InitWindow(screenWidth, screenHeight, "Squint live viewer");
+    InitWindow(160, 120, "Squint micro viewer");
     SetExitKey(KEY_NULL);
-    SetWindowState(FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT);
-    SetWindowMinSize(256, 256);
+    SetWindowState(FLAG_VSYNC_HINT);
 
-    SetTargetFPS(60); // Set our game to run at 60 frames-per-second
+    SetWindowMinSize(160, 120);
+
+    SetTargetFPS(60);
 
     Texture2D currentTexture{};
-    RenderTexture2D upscaledTexture{};
-
-    // Prepare the shaders.
-    // xBR-lv1 (no blend version)
-    Upscaler xbrLv1("shaders/xbr-lv1.frag");
-    xbrLv1.addUniform(Uniform{Uniform::Type::Int, "Corner mode", "XbrCornerMode", 2, 0.f, 2.f});
-    xbrLv1.addUniform(
-        Uniform{Uniform::Type::Float, "Luma Weight", "XbrYWeight", 48.f, 0.f, 100.f});
-    xbrLv1.addUniform(Uniform{Uniform::Type::Float,
-                              "Color match threshold",
-                              "XbrEqThreshold",
-                              30.f,
-                              0.f,
-                              50.f});
-    // xBR-lv2 (color blending version)
-    Upscaler xbrLv2("shaders/xbr-lv2.frag");
-    xbrLv2.addUniform(Uniform{Uniform::Type::Int, "Xbr Scale", "XbrScale", 4, 0.f, 5.f});
-    xbrLv2.addUniform(Uniform{Uniform::Type::Int, "Corner mode", "XbrCornerMode", 0, 0.f, 3.f});
-    xbrLv2.addUniform(
-        Uniform{Uniform::Type::Float, "Luma Weight", "XbrYWeight", 48.f, 0.f, 100.f});
-    xbrLv2.addUniform(Uniform{Uniform::Type::Float,
-                              "Color match threshold",
-                              "XbrEqThreshold",
-                              30.f,
-                              0.f,
-                              50.f});
-    xbrLv2.addUniform(
-        Uniform{Uniform::Type::Float, "Lv 2 coefficient", "XbrLv2Coefficient", 2.f, 0.f, 3.f});
-
-    int selectedUpscaler = 0;
-    bool upscalerComboBoxActive = false;
-    bool refreshUpscalee = false;
-    bool refreshRenderTarget = false;
-
-    bool darkBackground = false;
-    bool willScreenshot = false;
-
-    bool previouslyConnected = false;
 
     //--------------------------------------------------------------------------------------
 
-    // Main game loop
-    int renderScale = 5;
+    int renderScale = 1;
+
+    Vector2 windowSize = Vector2{160.f, 120.f};
+
+    bool previouslyConnected = false;
 
     while (!WindowShouldClose()) // Detect window close button or ESC key
     {
-        if (IsKeyPressed(KEY_TAB) || IsMouseButtonPressed(MOUSE_BUTTON_RIGHT))
+        if (IsKeyPressed(KEY_F))
         {
-            uiState = (uiState == UiState::Main) ? UiState::Nothing : UiState::Main;
+            unsigned int currentMonitor = GetCurrentMonitor();
+            Vector2 currentMonitorPosition = GetMonitorPosition(currentMonitor);
+            Vector2 currentMonitorSize =
+                Vector2{float(GetMonitorWidth(currentMonitor)), float(GetMonitorHeight(currentMonitor))};
+
+            useFullScreen = !useFullScreen;
+            if (useFullScreen)
+            {
+
+                windowSize = currentMonitorSize;
+                SetWindowSize(currentMonitorSize.x, currentMonitorSize.y);
+                SetWindowState(FLAG_VSYNC_HINT | FLAG_WINDOW_TOPMOST);
+                SetWindowPosition(currentMonitorPosition.x, currentMonitorPosition.y);
+            }
+            else
+            {
+                windowSize = {160.f, 120.f};
+
+                unsigned int currentMonitor = GetCurrentMonitor();
+                Vector2 centeredLocalPosition =
+                    Vector2{(currentMonitorSize.x - 160.f) / 2.f,
+                            (currentMonitorSize.y - 120.f) / 2.f};
+
+                Vector2 finalPosition =
+                    Vector2Add(currentMonitorPosition, centeredLocalPosition);
+                SetWindowSize(160, 120);
+                SetWindowState(FLAG_VSYNC_HINT);
+                ClearWindowState(FLAG_WINDOW_TOPMOST);
+                SetWindowPosition(finalPosition.x, finalPosition.y);
+            }
         }
 
-        if (IsKeyPressed(KEY_F1))
-        {
-            uiState = (uiState == UiState::Help) ? UiState::Nothing : UiState::Help;
-        }
-
-        if (IsKeyPressed(KEY_F2))
-        {
-            darkBackground = !darkBackground;
-        }
-
-        if (IsKeyPressed(KEY_S))
-        {
-            willScreenshot = true;
-        }
 
         // Draw
         //----------------------------------------------------------------------------------
         {
             BeginDrawing();
 
-            if (IsWindowResized())
-            {
-                screenWidth = GetScreenWidth();
-                screenHeight = GetScreenHeight();
-            }
-
             if (!imageServer.connected)
             {
                 ClearBackground(GRAY);
                 Vector2 size =
-                    MeasureTextEx(GetFontDefault(), "Waiting for connection.", 20, 0);
+                    MeasureTextEx(GetFontDefault(), "Waiting for connection.", 10, 0);
                 Vector2 pos;
-                pos.x = (screenWidth - size.x) / 2;
-                pos.y = (screenHeight - size.y) / 2;
-                DrawText("Waiting for connection.", int(pos.x), int(pos.y), 20, LIGHTGRAY);
+                pos.x = (windowSize.x - size.x) / 2.f;
+                pos.y = (windowSize.y - size.y) / 2.f;
+                DrawText("Waiting for connection.", int(pos.x), int(pos.y), 10, LIGHTGRAY);
             }
             else
             {
-                ClearBackground(darkBackground ? DARKGRAY : WHITE);
+                ClearBackground(WHITE);
                 AsepriteImage lastImage; 
                 if (imageServer.lastReadyImageMutex.try_lock())
                 {
@@ -194,7 +167,6 @@ int start()
 
                 if ((lastImage.width != 0 && lastImage.height != 0))
                 {
-                    refreshUpscalee = true;
                     bool sizeMismatch = lastImage.width != currentTexture.width ||
                                         lastImage.height != currentTexture.height;
                     // Regenerate the base texture
@@ -202,7 +174,6 @@ int start()
                     {
                         UnloadTexture(currentTexture);
                         currentTexture = LoadTextureFromImage(currentImage);
-                        refreshRenderTarget = true;
                     }
                     else
                     {
@@ -212,7 +183,6 @@ int start()
                 else if (imageServer.connected && !previouslyConnected)
                 {
                     // Clear the texture in case of reconnection.
-                    refreshUpscalee = true;
                     UnloadTexture(currentTexture);
                     Image blankPixel;
                     blankPixel.width = 1;
@@ -229,169 +199,13 @@ int start()
                     currentTexture = LoadTextureFromImage(blankPixel);
                 }
 
-                if (refreshRenderTarget)
-                {
-                    refreshRenderTarget = false;
-                    UnloadRenderTexture(upscaledTexture);
+                Vector2 texturePosition{(windowSize.x - currentTexture.width) / 2.f,
+                                        (windowSize.y - currentTexture.height) / 2.f};
 
-                    upscaledTexture = LoadRenderTexture(currentTexture.width * renderScale,
-                                                        currentTexture.height * renderScale);
-                    SetTextureFilter(currentTexture, TEXTURE_FILTER_POINT);
-                    SetTextureFilter(upscaledTexture.texture, TEXTURE_FILTER_POINT);
-                }
-
-                if (refreshUpscalee)
-                {
-                    refreshUpscalee = false;
-                    switch (selectedUpscaler)
-                    {
-                    case 0: {
-                        BeginTextureMode(upscaledTexture);
-                        ClearBackground(BLANK);
-                        // RenderTextures in OpenGL must be flipped on the Y axis.
-                        Rectangle src{0,
-                                      0,
-                                      float(currentTexture.width),
-                                      -float(currentTexture.height)};
-                        Rectangle dest{0,
-                                       0,
-                                       float(upscaledTexture.texture.width),
-                                       float(upscaledTexture.texture.height)};
-                        DrawTexturePro(currentTexture, src, dest, {0, 0}, 0.f, WHITE);
-                        EndTextureMode();
-                    }
-                    break;
-                    case 1:
-                        xbrLv1.draw(currentTexture, upscaledTexture);
-                        break;
-                    case 2:
-                        xbrLv2.draw(currentTexture, upscaledTexture);
-                        break;
-                    }
-                }
-
-                Vector2 texturePosition{(screenWidth - upscaledTexture.texture.width) / 2.f,
-                                        (screenHeight - upscaledTexture.texture.height) / 2.f};
-
-                DrawTextureEx(upscaledTexture.texture, texturePosition, 0, 1, WHITE);
+                DrawTextureEx(currentTexture, texturePosition, 0, 1, WHITE);
             }
 
             previouslyConnected = imageServer.connected;
-
-            if (uiState == UiState::Main)
-            {
-                int maxTextWidth = 0;
-                int numFields = 0;
-                {
-                    if (selectedUpscaler == 0)
-                    {
-                        maxTextWidth = MeasureText("Filter", 10);
-                    }
-                    else if (selectedUpscaler == 1)
-                    {
-                        maxTextWidth = xbrLv1.getTextWidth() + 32.f;
-                        numFields = xbrLv1.getNumUniforms();
-                    }
-                    else if (selectedUpscaler == 2)
-                    {
-                        maxTextWidth = xbrLv2.getTextWidth() + 32.f;
-                        numFields = xbrLv2.getNumUniforms();
-                    }
-                }
-
-                DrawRectangle(0,
-                              0,
-                              256.f + 16.f + maxTextWidth,
-                              32.f * numFields + 18 + 48.f,
-                              Color{255, 255, 255, 192});
-
-                float selectedScale =
-                    GuiSliderBar({8, 8, 256, 20}, nullptr, "Scale", float(renderScale), 1, 6);
-                int integerScale = roundf(selectedScale);
-                if (integerScale != renderScale)
-                {
-                    renderScale = integerScale;
-                    refreshRenderTarget = true;
-                    refreshUpscalee = true;
-                }
-
-                int previousSelection = selectedUpscaler;
-                if (GuiDropdownBox({8, 40, 256, 20},
-                                   "- None -;XBR-lv1;XBR-lv2",
-                                   &selectedUpscaler,
-                                   upscalerComboBoxActive))
-                {
-                    upscalerComboBoxActive = !upscalerComboBoxActive;
-                }
-                // The dropdown doesn't have a title, but let's add one just to have
-                // it looking like the rest of the controls.
-                // Ugly hacked coordinates.
-                DrawText("Filter", 268, 45, 10, Fade(GetColor(GuiGetStyle(COMBOBOX, 2)), 1.f));
-
-                if (!upscalerComboBoxActive)
-                {
-                    switch (selectedUpscaler)
-                    {
-                    case 1:
-                        refreshUpscalee |= xbrLv1.drawSettings(32, 72);
-                        break;
-                    case 2:
-                        refreshUpscalee |= xbrLv2.drawSettings(32, 72);
-                        break;
-                    }
-                }
-
-                if (selectedUpscaler != previousSelection)
-                {
-                    refreshUpscalee = true;
-                }
-
-                if (GuiButton({float(screenWidth) - 128 - 16, 8, 64, 20}, "Save!"))
-                {
-                    willScreenshot = true;
-                }
-
-                if (GuiButton({float(screenWidth) - 128 - 16, 40, 137, 20},
-                              "Toggle background"))
-                {
-                    darkBackground = !darkBackground;
-                }
-
-                if (GuiButton({float(screenWidth) - 64 - 8, 8, 64, 20}, "Help!"))
-                {
-                    uiState = UiState::Help;
-                }
-            }
-            else if (uiState == UiState::Help)
-            {
-                DrawRectangle(0, 0, screenWidth, screenHeight, Color{0, 0, 0, 128});
-                DrawTextBorder("Controls", 16, 18, 30, WHITE, BLACK);
-                DrawTextBorder(
-                    R"END(- F1 to toggle this help
-- F2 to toggle the background's color.
-- Right-click or TAB to toggle the options.
-- S to save the current result.
-- F12 to screenshot.)END",
-                    24,
-                    60,
-                    20,
-                    WHITE,
-                    BLACK);
-
-                if (GuiButton({float(screenWidth) - 64 - 8, 8, 64, 20}, "Back"))
-                {
-                    uiState = UiState::Main;
-                }
-            }
-
-            if (willScreenshot)
-            {
-                Image savedImage = LoadImageFromTexture(upscaledTexture.texture);
-                ExportImage(savedImage, "saved.png");
-                UnloadImage(savedImage);
-                willScreenshot = false;
-            }
-
             EndDrawing();
         }
         //----------------------------------------------------------------------------------
@@ -403,9 +217,6 @@ int start()
     // De-Initialization
     //--------------------------------------------------------------------------------------
     // Manual shader unload to avoid crashes due to unload order.
-    xbrLv1.unloadShader();
-    xbrLv2.unloadShader();
-    UnloadRenderTexture(upscaledTexture);
     UnloadTexture(currentTexture);
 
     CloseWindow(); // Close window and OpenGL context
